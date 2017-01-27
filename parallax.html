@@ -1,627 +1,631 @@
-<body onload="webGLStart();" style="width:100%; height:100%;">
-	<center><canvas id="canvas" style="border: none;" width="1024px" height="768px"></canvas><br>
-	<input type="range" id="parallax" value="0"><br>
-	<input type="radio" name="mode" value="0" checked> Simple parallax<br>
-	<input type="radio" name="mode" value="1" > Steep Parallax<br>
-	<input type="radio" name="mode" value="2" > Parallax Occlusion<br>
-	<input type="checkbox" id="correction" value="1" > sRGB Gamma Correction<br></center>
+<html>
+	<head>
+		<script type="text/javascript" src="gltools.js"/>
+		<script type="text/javascript" src="gl.js"/>
+	</head>
+	<body onload="webGLStart();" style="width:100%; height:100%;">
+		<center><canvas id="canvas" style="border: none;" width="1024px" height="768px"></canvas><br>
+		<input type="range" id="parallax" value="0"><br>
+		<input type="radio" name="mode" value="0" checked> Simple parallax<br>
+		<input type="radio" name="mode" value="1" > Steep Parallax<br>
+		<input type="radio" name="mode" value="2" > Parallax Occlusion<br>
+		<input type="checkbox" id="correction" value="1" > sRGB Gamma Correction<br></center>
 
-	<script type="text/javascript" src="gltools.js"/>
-	<script type="text/javascript" src="gl.js"/>
-	<script id="shader-fs" type="x-shader/x-fragment">
-		precision highp float;
-		precision highp sampler2D;
-		varying vec3 pos;
-		varying vec2 texmap;
-		varying vec3 light;
-		uniform sampler2D colorTexture;
-		uniform sampler2D normalTexture;
-		uniform sampler2D bumpTexture;
-		uniform sampler2D specTexture;
-		uniform float height_scale;
-		uniform int mode;
-		uniform int gammaCorrection;
+		<script id="shader-fs" type="x-shader/x-fragment">
+			precision highp float;
+			precision highp sampler2D;
+			varying vec3 pos;
+			varying vec2 texmap;
+			varying vec3 light;
+			uniform sampler2D colorTexture;
+			uniform sampler2D normalTexture;
+			uniform sampler2D bumpTexture;
+			uniform sampler2D specTexture;
+			uniform float height_scale;
+			uniform int mode;
+			uniform int gammaCorrection;
 
-		vec2 ParallaxMapping(in vec2 texCoords, in vec3 viewDir)
-		{
-			float height =  1.0-texture2D(bumpTexture, texCoords).r;
-			vec2 p = viewDir.xy / viewDir.z * (height * height_scale);
-			return texCoords - p;
-		}
-		vec2 SteepParallaxMapping(in vec2 texCoords, in vec3 viewDir){
-			// the amount to shift the texture coordinates per layer (from vector P)
-			vec2 deltaTexCoords = viewDir.xy/viewDir.z * height_scale *0.1;
-			vec2  currentTexCoords     = texCoords;
-			float currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
-			float lastDepthMapValue=currentDepthMapValue;
-			vec2 lastTexCoords=currentTexCoords;
-			float lastDepth=0.0;
-			for(float currentLayerDepth=0.0;currentLayerDepth<1.0;currentLayerDepth+=0.1)
+			vec2 ParallaxMapping(in vec2 texCoords, in vec3 viewDir)
 			{
-				if(currentLayerDepth>=currentDepthMapValue) break;
-				lastTexCoords=currentTexCoords;
-				lastDepthMapValue=currentDepthMapValue;
-				lastDepth= currentLayerDepth;
-				currentTexCoords -= deltaTexCoords;
-				currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
+				float height =  1.0-texture2D(bumpTexture, texCoords).r;
+				vec2 p = viewDir.xy / viewDir.z * (height * height_scale);
+				return texCoords - p;
 			}
-			deltaTexCoords/=5.0;
-			float startDepth=lastDepth;
-			currentDepthMapValue=lastDepthMapValue;
-			currentTexCoords=lastTexCoords;
-			for(float currentLayerDepth=0.0;currentLayerDepth<0.1;currentLayerDepth+=0.02)
-			{
-				if(currentLayerDepth+startDepth>=currentDepthMapValue) break;
-				lastTexCoords=currentTexCoords;
-				lastDepthMapValue=currentDepthMapValue;
-				lastDepth= currentLayerDepth;
-				currentTexCoords -= deltaTexCoords;
-				currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
-			}
-			deltaTexCoords/=5.0;
-			startDepth+=lastDepth;
-			currentDepthMapValue=lastDepthMapValue;
-			currentTexCoords=lastTexCoords;
-			for(float currentLayerDepth=0.0;currentLayerDepth<0.02;currentLayerDepth+=0.004)
-			{
-				if(currentLayerDepth+startDepth>=currentDepthMapValue) break;
-				lastTexCoords=currentTexCoords;
-				lastDepthMapValue=currentDepthMapValue;
-				lastDepth= currentLayerDepth;
-				currentTexCoords -= deltaTexCoords;
-				currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
-			}
-
-			return currentTexCoords;
-		}
-		vec2 ParallaxOcclusionMapping(in vec2 texCoords, in vec3 viewDir){
-			// the amount to shift the texture coordinates per layer (from vector P)
-			vec2 deltaTexCoords = viewDir.xy/viewDir.z * height_scale *0.1;
-			vec2  currentTexCoords     = texCoords;
-			float currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
-			float lastDepthMapValue=currentDepthMapValue;
-			vec2 lastTexCoords=currentTexCoords;
-			float lastDepth=0.0;
-			for(float currentLayerDepth=0.0;currentLayerDepth<1.0;currentLayerDepth+=0.1)
-			{
-				if(currentLayerDepth>=currentDepthMapValue) break;
-				lastTexCoords=currentTexCoords;
-				lastDepthMapValue=currentDepthMapValue;
-				lastDepth= currentLayerDepth;
-				currentTexCoords -= deltaTexCoords;
-				currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
-			}
-			deltaTexCoords/=5.0;
-			float startDepth=lastDepth;
-			currentDepthMapValue=lastDepthMapValue;
-			currentTexCoords=lastTexCoords;
-			for(float currentLayerDepth=0.0;currentLayerDepth<0.1;currentLayerDepth+=0.02)
-			{
-				if(currentLayerDepth+startDepth>=currentDepthMapValue) break;
-				lastTexCoords=currentTexCoords;
-				lastDepthMapValue=currentDepthMapValue;
-				lastDepth= currentLayerDepth;
-				currentTexCoords -= deltaTexCoords;
-				currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
-			}
-			deltaTexCoords/=5.0;
-			startDepth+=lastDepth;
-			currentDepthMapValue=lastDepthMapValue;
-			currentTexCoords=lastTexCoords;
-			for(float currentLayerDepth=0.0;currentLayerDepth<0.02;currentLayerDepth+=0.004)
-			{
-				if(currentLayerDepth+startDepth>=currentDepthMapValue) break;
-				lastTexCoords=currentTexCoords;
-				lastDepthMapValue=currentDepthMapValue;
-				lastDepth= currentLayerDepth;
-				currentTexCoords -= deltaTexCoords;
-				currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
-			}
-			lastDepth+=startDepth;
-			float afterDepth=currentDepthMapValue-lastDepth-0.004;
-			float beforeDepth=lastDepth-lastDepthMapValue;
-			float w=afterDepth/(afterDepth+beforeDepth);
-
-			currentTexCoords=lastTexCoords*w+currentTexCoords*(1.0-w);
-
-			return currentTexCoords;
-		}
-		float gamma = 2.2;
-		vec4 gammaCorrect(in vec4 v){
-			if(gammaCorrection==0) return v;
-			vec4 o=v;
-			o.r=pow(o.r,1.0/gamma);
-			o.g=pow(o.g,1.0/gamma);
-			o.b=pow(o.b,1.0/gamma);
-			return o;
-		}
-		vec4 textureCorrect(in vec4 v){
-			if(gammaCorrection==0) return v;
-			vec4 o=v;
-			o.r=pow(o.r,gamma);
-			o.g=pow(o.g,gamma);
-			o.b=pow(o.b,gamma);
-			return o;
-		}
-		void main(void) {
-			vec3 L=normalize(light-pos);
-			vec3 E = normalize(pos);
-
-			vec2 tex;
-			if(mode==1)
-				tex=SteepParallaxMapping(texmap,E);
-			else if(mode==2)
-				tex=ParallaxOcclusionMapping(texmap,E);
-			else
-				tex=ParallaxMapping(texmap,E);
-
-			//if(tex.x > 1.0 || tex.y > 1.0 || tex.x < 0.0 || tex.y < 0.0)
-			//	discard;
-
-			vec3 norm=normalize(texture2D( normalTexture, tex ).rgb*2.0 - 1.0);
-			float shininess=64.0;
-			float specIntensity = pow(max(dot(norm,normalize(L - E)),0.0),shininess/4.0);
-			specIntensity = clamp(specIntensity, 0.0, 1.0);
-			float lightIntensity = dot(norm, L)*1.7;
-			lightIntensity = clamp(lightIntensity, 0.0, 1.0);
-			if(dot(norm, L)<=0.0){
-				specIntensity=0.0;
-				lightIntensity=0.0;
-			}
-			float ambientIntensity = 0.3;
-
-			gl_FragColor=gammaCorrect(textureCorrect(texture2D(colorTexture, tex))*(lightIntensity+ambientIntensity)+textureCorrect(texture2D(specTexture, tex))*specIntensity);
-			gl_FragColor.a=1.0;
-		}
-	</script>
-	<script id="shader-vs" type="x-shader/x-vertex">
-		attribute vec3 aVertexPosition;
-		attribute vec3 aVertexNormal;
-		attribute vec2 aVertexTexmap;
-		attribute vec3 aVertexTangent;
-		attribute vec3 aVertexBinormal;
-		varying vec3 pos;
-		varying vec2 texmap;
-		varying vec3 light;
-		uniform mat4 uMVMatrix;
-		uniform mat4 uNMVMatrix;
-		uniform mat4 uPMatrix;
-
-		mat3 transpose(in mat3 inMatrix) {
-			vec3 i0 = inMatrix[0];
-			vec3 i1 = inMatrix[1];
-			vec3 i2 = inMatrix[2];
-
-			mat3 outMatrix = mat3(
-						 vec3(i0.x, i1.x, i2.x),
-						 vec3(i0.y, i1.y, i2.y),
-						 vec3(i0.z, i1.z, i2.z)
-						 );
-
-			return outMatrix;
-		}
-		void main(void) {
-			texmap=aVertexTexmap;
-			vec3 norm=normalize((uNMVMatrix* vec4(aVertexNormal, 1.0)).xyz);
-			vec3 tangent=normalize((uNMVMatrix* vec4(aVertexTangent, 1.0)).xyz);
-			vec3 binorm=normalize((uNMVMatrix* vec4(aVertexBinormal, 1.0)).xyz);
-			mat3 TBN = transpose(mat3(
-				tangent,
-				binorm,
-				norm
-			));
-			pos=TBN*(uMVMatrix* vec4(aVertexPosition, 1.0)).xyz;
-			light=TBN*(uMVMatrix* vec4(2.0,2.0,2.0,1.0)).xyz;
-			gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
-		}
-	</script>
-	<script type="text/javascript">
-		"use strict";
-		var gl;
-		var shaderProgram;
-		function initShaders() {
-			var fragmentShader = gl.getShader(gl, "shader-fs");
-			var vertexShader = gl.getShader(gl, "shader-vs");
-			shaderProgram = gl.createProgram();
-			gl.attachShader(shaderProgram, vertexShader);
-			gl.attachShader(shaderProgram, fragmentShader);
-			gl.linkProgram(shaderProgram);
-			if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-				alert("Could not initialise shaders");
-			}
-			gl.useProgram(shaderProgram);
-			shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
-			gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
-			shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
-			gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
-			shaderProgram.vertexTexmapAttribute = gl.getAttribLocation(shaderProgram, "aVertexTexmap");
-			gl.enableVertexAttribArray(shaderProgram.vertexTexmapAttribute);
-			shaderProgram.vertexTangentAttribute = gl.getAttribLocation(shaderProgram, "aVertexTangent");
-			gl.enableVertexAttribArray(shaderProgram.vertexTangentAttribute);
-			shaderProgram.vertexBinormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexBinormal");
-			gl.enableVertexAttribArray(shaderProgram.vertexBinormalAttribute);
-			shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
-			shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
-			shaderProgram.nmvMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMVMatrix");
-			shaderProgram.colorTexture = gl.getUniformLocation(shaderProgram, "colorTexture");
-			shaderProgram.normalTexture = gl.getUniformLocation(shaderProgram, "normalTexture");
-			shaderProgram.bumpTexture = gl.getUniformLocation(shaderProgram, "bumpTexture");
-			shaderProgram.specTexture = gl.getUniformLocation(shaderProgram, "specTexture");
-			shaderProgram.parallax=gl.getUniformLocation(shaderProgram,"height_scale");
-			shaderProgram.gammaCorrection = gl.getUniformLocation(shaderProgram, "gammaCorrection");
-			shaderProgram.mode=gl.getUniformLocation(shaderProgram,"mode");
-		}
-		var mvMatrix = mat4.create();
-		var pMatrix = mat4.create();
-		var parallax=0.0;
-		var mode=0;
-		var gammaCorrection=0;
-		function setUniforms() {
-			gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
-			gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
-			var nmvMatrix=mvMatrix;
-			mat4.inverse(nmvMatrix);
-			mat4.transpose(nmvMatrix);
-			gl.uniformMatrix4fv(shaderProgram.nmvMatrixUniform, false, nmvMatrix);
-			gl.uniform1f(shaderProgram.parallax, parallax);
-			gl.uniform1i(shaderProgram.mode, mode);
-			gl.uniform1i(shaderProgram.gammaCorrection, gammaCorrection);
-		}
-		function initTextures() {
-			gl.addTexture("textures/cobblestone.jpg",shaderProgram.colorTexture,true);
-			gl.addTexture("textures/cobblestone_norma.jpg",shaderProgram.normalTexture,true);
-			gl.addTexture("textures/cobblestone_disp.jpg",shaderProgram.bumpTexture,true);
-			gl.addTexture("textures/cobblestone_spec.jpg",shaderProgram.specTexture,true);
-		}
-		function initBuffers() {
-			var vertices = [
-				1.0, -1.0,  -1.0,
-				-1.0, -1.0,  -1.0,
-				-1.0,  1.0,  -1.0,
-
-				1.0, 1.0,  -1.0,
-				1.0, -1.0,  -1.0,
-				-1.0,  1.0,  -1.0,
-
-
-				-1.0, -1.0,  1.0,
-				1.0, -1.0,  1.0,
-				1.0,  1.0,  1.0,
-
-				-1.0, 1.0,  1.0,
-				-1.0, -1.0,  1.0,
-				1.0,  1.0,  1.0,
-
-
-				-1.0, 1.0,  -1.0,
-				-1.0, -1.0,  -1.0,
-				-1.0,  -1.0,  1.0,
-
-				-1.0, 1.0,  1.0,
-				-1.0, 1.0,  -1.0,
-				-1.0,  -1.0,  1.0,
-
-
-				1.0, -1.0,  -1.0,
-				1.0, 1.0,  -1.0,
-				1.0,  1.0,  1.0,
-
-				1.0, -1.0,  1.0,
-				1.0, -1.0,  -1.0,
-				1.0,  1.0,  1.0,
-
-
-				1.0,  1.0, -1.0,
-				-1.0,  1.0, -1.0,
-				-1.0, 1.0,  1.0,
-
-				1.0, 1.0,  1.0,
-				1.0, 1.0, -1.0,
-				-1.0, 1.0,  1.0,
-
-
-				-1.0, -1.0,  -1.0,
-				1.0, -1.0,  -1.0,
-				1.0, -1.0,  1.0,
-
-				-1.0, -1.0,  1.0,
-				-1.0, -1.0,  -1.0,
-				 1.0, -1.0,  1.0,
-
-
-				2.0,  0.0, -2.0,
-				-2.0,  0.0, -2.0,
-				-2.0, 0.0,  2.0,
-
-				2.0, 0.0,  2.0,
-				2.0, 0.0, -2.0,
-				-2.0, 0.0,  2.0,
-			];
-			gl.addBuffer(vertices,3,shaderProgram.vertexPositionAttribute);
-
-			var normals = [
-				0.0, 0.0, -1.0,
-				0.0, 0.0, -1.0,
-				0.0, 0.0, -1.0,
-
-				0.0, 0.0, -1.0,
-				0.0, 0.0, -1.0,
-				0.0, 0.0, -1.0,
-
-
-				0.0, 0.0,  1.0,
-				0.0, 0.0,  1.0,
-				0.0, 0.0,  1.0,
-
-				0.0, 0.0,  1.0,
-				0.0, 0.0,  1.0,
-				0.0, 0.0,  1.0,
-
-
-				-1.0, 0.0,  0.0,
-				-1.0, 0.0,  0.0,
-				-1.0, 0.0,  0.0,
-
-				-1.0, 0.0,  0.0,
-				-1.0, 0.0,  0.0,
-				-1.0, 0.0,  0.0,
-
-
-				1.0, 0.0,  0.0,
-				1.0, 0.0,  0.0,
-				1.0, 0.0,  0.0,
-
-				1.0, 0.0,  0.0,
-				1.0, 0.0,  0.0,
-				1.0, 0.0,  0.0,
-
-
-				0.0, 1.0, 0.0,
-				0.0, 1.0, 0.0,
-				0.0, 1.0, 0.0,
-
-				0.0, 1.0, 0.0,
-				0.0, 1.0, 0.0,
-				0.0, 1.0, 0.0,
-
-
-				0.0, -1.0, 0.0,
-				0.0, -1.0, 0.0,
-				0.0, -1.0, 0.0,
-
-				0.0, -1.0, 0.0,
-				0.0, -1.0, 0.0,
-				0.0, -1.0, 0.0,
-
-				0.0, 1.0, 0.0,
-				0.0, 1.0, 0.0,
-				0.0, 1.0, 0.0,
-
-				0.0, 1.0, 0.0,
-				0.0, 1.0, 0.0,
-				0.0, 1.0, 0.0,
-			];
-			gl.addBuffer(normals,3,shaderProgram.vertexNormalAttribute);
-
-			var texmap = [
-				2.0, 0.0,
-				0.0, 0.0,
-				0.0,  2.0,
-
-				2.0, 2.0,
-				2.0, 0.0,
-				0.0,  2.0,
-
-
-				0.0, 0.0,
-				2.0, 0.0,
-				2.0,  2.0,
-
-				0.0, 2.0,
-				0.0, 0.0,
-				2.0,  2.0,
-
-
-				2.0,  0.0,
-				0.0,  0.0,
-				0.0,  2.0,
-
-				2.0,  2.0,
-				2.0,  0.0,
-				 0.0,  2.0,
-
-
-				 0.0,  0.0,
-				 2.0,  0.0,
-				  2.0,  2.0,
-
-				 0.0,  2.0,
-				 0.0,  0.0,
-				  2.0,  2.0,
-
-
-				2.0,  0.0,
-				0.0,  0.0,
-				0.0,   2.0,
-
-				2.0,   2.0,
-				2.0,  0.0,
-				0.0,  2.0,
-
-
-				0.0,   0.0,
-				2.0,   0.0,
-				2.0,  2.0,
-
-				0.0,   2.0,
-				0.0,   0.0,
-				 2.0,   2.0,
-
-				2.0,  0.0,
-				0.0,  0.0,
-				0.0,   2.0,
-
-				2.0,   2.0,
-				2.0,  0.0,
-				0.0,  2.0,
-			];
-			gl.addBuffer(texmap,2,shaderProgram.vertexTexmapAttribute);
-
-			var tangents = [];
-			var binormals = [];
-			for ( var i=0; i<vertices.length; i+=9){
-				var v00 = vertices[i+0];
-				var v01 = vertices[i+1];
-				var v02 = vertices[i+2];
-				var v10 = vertices[i+3];
-				var v11 = vertices[i+4];
-				var v12 = vertices[i+5];
-				var v20 = vertices[i+6];
-				var v21 = vertices[i+7];
-				var v22 = vertices[i+8];
-
-				// Shortcuts for UVs
-				var uv00 = texmap[i/3*2+0];
-				var uv01 = texmap[i/3*2+1];
-				var uv10 = texmap[i/3*2+2];
-				var uv11 = texmap[i/3*2+3];
-				var uv20 = texmap[i/3*2+4];
-				var uv21 = texmap[i/3*2+5];
-
-				// Edges of the triangle : postion delta
-				var deltaPos10 = v10-v00;
-				var deltaPos11 = v11-v01;
-				var deltaPos12 = v12-v02;
-				var deltaPos20 = v20-v00;
-				var deltaPos21 = v21-v01;
-				var deltaPos22 = v22-v02;
-
-				// UV delta
-				var deltaUV10 = uv10-uv00;
-				var deltaUV11 = uv11-uv01;
-				var deltaUV20 = uv20-uv00;
-				var deltaUV21 = uv21-uv01;
-				var r = 1.0 / (deltaUV10 * deltaUV21 - deltaUV11 * deltaUV20);
-				var tangent0 = (deltaPos10 * deltaUV21   - deltaPos20 * deltaUV11)*r;
-				var tangent1 = (deltaPos11 * deltaUV21   - deltaPos21 * deltaUV11)*r;
-				var tangent2 = (deltaPos12 * deltaUV21   - deltaPos22 * deltaUV11)*r;
-				tangents.push(tangent0);
-				tangents.push(tangent1);
-				tangents.push(tangent2);
-				tangents.push(tangent0);
-				tangents.push(tangent1);
-				tangents.push(tangent2);
-				tangents.push(tangent0);
-				tangents.push(tangent1);
-				tangents.push(tangent2);
-				var binormal0 = (deltaPos20 * deltaUV10   - deltaPos10 * deltaUV20)*r;
-				var binormal1 = (deltaPos21 * deltaUV10   - deltaPos11 * deltaUV20)*r;
-				var binormal2 = (deltaPos22 * deltaUV10   - deltaPos12 * deltaUV20)*r;
-				binormals.push(binormal0);
-				binormals.push(binormal1);
-				binormals.push(binormal2);
-				binormals.push(binormal0);
-				binormals.push(binormal1);
-				binormals.push(binormal2);
-				binormals.push(binormal0);
-				binormals.push(binormal1);
-				binormals.push(binormal2);
-			}
-			gl.addBuffer(tangents,3,shaderProgram.vertexTangentAttribute);
-			gl.addBuffer(binormals,3,shaderProgram.vertexBinormalAttribute);
-		}
-		var angleX=0.0;
-		var angleY=0.0;
-		var paralaxSlider;
-		var radios;
-		var correctionBox;
-		function drawScene() {
-			gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-			mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
-			mat4.identity(mvMatrix);
-			mat4.translate(mvMatrix, [0.0,  0.0,-3.0]);
-			mat4.rotateX(mvMatrix, -1.57079632679+angleY);
-			mat4.rotateZ(mvMatrix, angleX+3.14);
-			parallax=paralaxSlider.value*1.0/400;
-			for (var i = 0, length = radios.length; i < length; i++) {
-				if (radios[i].checked) {
-					mode=radios[i].value;
-					break;
+			vec2 SteepParallaxMapping(in vec2 texCoords, in vec3 viewDir){
+				// the amount to shift the texture coordinates per layer (from vector P)
+				vec2 deltaTexCoords = viewDir.xy/viewDir.z * height_scale *0.1;
+				vec2  currentTexCoords     = texCoords;
+				float currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
+				float lastDepthMapValue=currentDepthMapValue;
+				vec2 lastTexCoords=currentTexCoords;
+				float lastDepth=0.0;
+				for(float currentLayerDepth=0.0;currentLayerDepth<1.0;currentLayerDepth+=0.1)
+				{
+					if(currentLayerDepth>=currentDepthMapValue) break;
+					lastTexCoords=currentTexCoords;
+					lastDepthMapValue=currentDepthMapValue;
+					lastDepth= currentLayerDepth;
+					currentTexCoords -= deltaTexCoords;
+					currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
 				}
+				deltaTexCoords/=5.0;
+				float startDepth=lastDepth;
+				currentDepthMapValue=lastDepthMapValue;
+				currentTexCoords=lastTexCoords;
+				for(float currentLayerDepth=0.0;currentLayerDepth<0.1;currentLayerDepth+=0.02)
+				{
+					if(currentLayerDepth+startDepth>=currentDepthMapValue) break;
+					lastTexCoords=currentTexCoords;
+					lastDepthMapValue=currentDepthMapValue;
+					lastDepth= currentLayerDepth;
+					currentTexCoords -= deltaTexCoords;
+					currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
+				}
+				deltaTexCoords/=5.0;
+				startDepth+=lastDepth;
+				currentDepthMapValue=lastDepthMapValue;
+				currentTexCoords=lastTexCoords;
+				for(float currentLayerDepth=0.0;currentLayerDepth<0.02;currentLayerDepth+=0.004)
+				{
+					if(currentLayerDepth+startDepth>=currentDepthMapValue) break;
+					lastTexCoords=currentTexCoords;
+					lastDepthMapValue=currentDepthMapValue;
+					lastDepth= currentLayerDepth;
+					currentTexCoords -= deltaTexCoords;
+					currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
+				}
+
+				return currentTexCoords;
 			}
-			gammaCorrection=correctionBox.checked?1:0;
-			setUniforms();
-			gl.drawBuffers();
-		}
-		function tick(){
-			requestAnimFrame(tick);
-			drawScene();
-		}
-		function webGLStart() {
-			var canvas = document.getElementById("canvas");
-			paralaxSlider=document.getElementById("parallax");
-			radios=document.getElementsByName('mode');
-			correctionBox=document.getElementById('correction');
-			canvas.onmousedown = handleMouseDown;
-			document.onmouseup = handleMouseUp;
-			document.onmousemove = handleMouseMove;
-			canvas.ontouchstart = function(e){
-				if(e.preventDefault)
-					e.preventDefault();
-				handleMouseDown(e.changedTouches[0]);
-			};
-			canvas.ontouchend = function(e){
-				if(e.preventDefault)
-					e.preventDefault();
-				handleMouseUp(e.changedTouches[0]);
-			};
-			canvas.ontouchmove = function(e){
-				if(e.preventDefault)
-					e.preventDefault();
-				handleMouseMove(e.changedTouches[0]);
-			};
-			gl = initGL(canvas);
-			initShaders();
-			initBuffers();
-			initTextures();
-			gl.clearColor(0.0, 0.0, 0.0, 1.0);
-			gl.enable(gl.CULL_FACE);
-			gl.enable(gl.DEPTH_TEST);
-			tick();
-		}
-		var mouseDown = false;
-		var lastMouseX = null;
-		var lastMouseY = null;
-		function handleMouseDown(event) {
-			if(event.preventDefault)
-				event.preventDefault();
-			mouseDown = true;
-			lastMouseX = event.clientX;
-			lastMouseY = event.clientY;
-			return false;
-		}
+			vec2 ParallaxOcclusionMapping(in vec2 texCoords, in vec3 viewDir){
+				// the amount to shift the texture coordinates per layer (from vector P)
+				vec2 deltaTexCoords = viewDir.xy/viewDir.z * height_scale *0.1;
+				vec2  currentTexCoords     = texCoords;
+				float currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
+				float lastDepthMapValue=currentDepthMapValue;
+				vec2 lastTexCoords=currentTexCoords;
+				float lastDepth=0.0;
+				for(float currentLayerDepth=0.0;currentLayerDepth<1.0;currentLayerDepth+=0.1)
+				{
+					if(currentLayerDepth>=currentDepthMapValue) break;
+					lastTexCoords=currentTexCoords;
+					lastDepthMapValue=currentDepthMapValue;
+					lastDepth= currentLayerDepth;
+					currentTexCoords -= deltaTexCoords;
+					currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
+				}
+				deltaTexCoords/=5.0;
+				float startDepth=lastDepth;
+				currentDepthMapValue=lastDepthMapValue;
+				currentTexCoords=lastTexCoords;
+				for(float currentLayerDepth=0.0;currentLayerDepth<0.1;currentLayerDepth+=0.02)
+				{
+					if(currentLayerDepth+startDepth>=currentDepthMapValue) break;
+					lastTexCoords=currentTexCoords;
+					lastDepthMapValue=currentDepthMapValue;
+					lastDepth= currentLayerDepth;
+					currentTexCoords -= deltaTexCoords;
+					currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
+				}
+				deltaTexCoords/=5.0;
+				startDepth+=lastDepth;
+				currentDepthMapValue=lastDepthMapValue;
+				currentTexCoords=lastTexCoords;
+				for(float currentLayerDepth=0.0;currentLayerDepth<0.02;currentLayerDepth+=0.004)
+				{
+					if(currentLayerDepth+startDepth>=currentDepthMapValue) break;
+					lastTexCoords=currentTexCoords;
+					lastDepthMapValue=currentDepthMapValue;
+					lastDepth= currentLayerDepth;
+					currentTexCoords -= deltaTexCoords;
+					currentDepthMapValue = 1.0-texture2D(bumpTexture, currentTexCoords).r;
+				}
+				lastDepth+=startDepth;
+				float afterDepth=currentDepthMapValue-lastDepth-0.004;
+				float beforeDepth=lastDepth-lastDepthMapValue;
+				float w=afterDepth/(afterDepth+beforeDepth);
 
-		function handleMouseUp(event) {
-			mouseDown = false;
-		}
+				currentTexCoords=lastTexCoords*w+currentTexCoords*(1.0-w);
 
-		function handleMouseMove(event) {
-			if (!mouseDown) {
-				return;
+				return currentTexCoords;
 			}
-			var newX = event.clientX;
-			var newY = event.clientY;
+			float gamma = 2.2;
+			vec4 gammaCorrect(in vec4 v){
+				if(gammaCorrection==0) return v;
+				vec4 o=v;
+				o.r=pow(o.r,1.0/gamma);
+				o.g=pow(o.g,1.0/gamma);
+				o.b=pow(o.b,1.0/gamma);
+				return o;
+			}
+			vec4 textureCorrect(in vec4 v){
+				if(gammaCorrection==0) return v;
+				vec4 o=v;
+				o.r=pow(o.r,gamma);
+				o.g=pow(o.g,gamma);
+				o.b=pow(o.b,gamma);
+				return o;
+			}
+			void main(void) {
+				vec3 L=normalize(light-pos);
+				vec3 E = normalize(pos);
 
-			var deltaX = newX - lastMouseX;
-			var deltaY = newY - lastMouseY;
+				vec2 tex;
+				if(mode==1)
+					tex=SteepParallaxMapping(texmap,E);
+				else if(mode==2)
+					tex=ParallaxOcclusionMapping(texmap,E);
+				else
+					tex=ParallaxMapping(texmap,E);
 
-			angleX+=deltaX / 573.0;
-			angleY+=deltaY / 573.0;
+				//if(tex.x > 1.0 || tex.y > 1.0 || tex.x < 0.0 || tex.y < 0.0)
+				//	discard;
 
-			lastMouseX = newX
-			lastMouseY = newY;
-		}
-	</script>
+				vec3 norm=normalize(texture2D( normalTexture, tex ).rgb*2.0 - 1.0);
+				float shininess=64.0;
+				float specIntensity = pow(max(dot(norm,normalize(L - E)),0.0),shininess/4.0);
+				specIntensity = clamp(specIntensity, 0.0, 1.0);
+				float lightIntensity = dot(norm, L)*1.7;
+				lightIntensity = clamp(lightIntensity, 0.0, 1.0);
+				if(dot(norm, L)<=0.0){
+					specIntensity=0.0;
+					lightIntensity=0.0;
+				}
+				float ambientIntensity = 0.3;
 
-</body>
+				gl_FragColor=gammaCorrect(textureCorrect(texture2D(colorTexture, tex))*(lightIntensity+ambientIntensity)+textureCorrect(texture2D(specTexture, tex))*specIntensity);
+				gl_FragColor.a=1.0;
+			}
+		</script>
+		<script id="shader-vs" type="x-shader/x-vertex">
+			attribute vec3 aVertexPosition;
+			attribute vec3 aVertexNormal;
+			attribute vec2 aVertexTexmap;
+			attribute vec3 aVertexTangent;
+			attribute vec3 aVertexBinormal;
+			varying vec3 pos;
+			varying vec2 texmap;
+			varying vec3 light;
+			uniform mat4 uMVMatrix;
+			uniform mat4 uNMVMatrix;
+			uniform mat4 uPMatrix;
+
+			mat3 transpose(in mat3 inMatrix) {
+				vec3 i0 = inMatrix[0];
+				vec3 i1 = inMatrix[1];
+				vec3 i2 = inMatrix[2];
+
+				mat3 outMatrix = mat3(
+							 vec3(i0.x, i1.x, i2.x),
+							 vec3(i0.y, i1.y, i2.y),
+							 vec3(i0.z, i1.z, i2.z)
+							 );
+
+				return outMatrix;
+			}
+			void main(void) {
+				texmap=aVertexTexmap;
+				vec3 norm=normalize((uNMVMatrix* vec4(aVertexNormal, 1.0)).xyz);
+				vec3 tangent=normalize((uNMVMatrix* vec4(aVertexTangent, 1.0)).xyz);
+				vec3 binorm=normalize((uNMVMatrix* vec4(aVertexBinormal, 1.0)).xyz);
+				mat3 TBN = transpose(mat3(
+					tangent,
+					binorm,
+					norm
+				));
+				pos=TBN*(uMVMatrix* vec4(aVertexPosition, 1.0)).xyz;
+				light=TBN*(uMVMatrix* vec4(2.0,2.0,2.0,1.0)).xyz;
+				gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+			}
+		</script>
+		<script type="text/javascript">
+			"use strict";
+			var gl;
+			var shaderProgram;
+			function initShaders() {
+				var fragmentShader = gl.getShader(gl, "shader-fs");
+				var vertexShader = gl.getShader(gl, "shader-vs");
+				shaderProgram = gl.createProgram();
+				gl.attachShader(shaderProgram, vertexShader);
+				gl.attachShader(shaderProgram, fragmentShader);
+				gl.linkProgram(shaderProgram);
+				if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+					alert("Could not initialise shaders");
+				}
+				gl.useProgram(shaderProgram);
+				shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+				gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+				shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
+				gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+				shaderProgram.vertexTexmapAttribute = gl.getAttribLocation(shaderProgram, "aVertexTexmap");
+				gl.enableVertexAttribArray(shaderProgram.vertexTexmapAttribute);
+				shaderProgram.vertexTangentAttribute = gl.getAttribLocation(shaderProgram, "aVertexTangent");
+				gl.enableVertexAttribArray(shaderProgram.vertexTangentAttribute);
+				shaderProgram.vertexBinormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexBinormal");
+				gl.enableVertexAttribArray(shaderProgram.vertexBinormalAttribute);
+				shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+				shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+				shaderProgram.nmvMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMVMatrix");
+				shaderProgram.colorTexture = gl.getUniformLocation(shaderProgram, "colorTexture");
+				shaderProgram.normalTexture = gl.getUniformLocation(shaderProgram, "normalTexture");
+				shaderProgram.bumpTexture = gl.getUniformLocation(shaderProgram, "bumpTexture");
+				shaderProgram.specTexture = gl.getUniformLocation(shaderProgram, "specTexture");
+				shaderProgram.parallax=gl.getUniformLocation(shaderProgram,"height_scale");
+				shaderProgram.gammaCorrection = gl.getUniformLocation(shaderProgram, "gammaCorrection");
+				shaderProgram.mode=gl.getUniformLocation(shaderProgram,"mode");
+			}
+			var mvMatrix = mat4.create();
+			var pMatrix = mat4.create();
+			var parallax=0.0;
+			var mode=0;
+			var gammaCorrection=0;
+			function setUniforms() {
+				gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+				gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+				var nmvMatrix=mvMatrix;
+				mat4.inverse(nmvMatrix);
+				mat4.transpose(nmvMatrix);
+				gl.uniformMatrix4fv(shaderProgram.nmvMatrixUniform, false, nmvMatrix);
+				gl.uniform1f(shaderProgram.parallax, parallax);
+				gl.uniform1i(shaderProgram.mode, mode);
+				gl.uniform1i(shaderProgram.gammaCorrection, gammaCorrection);
+			}
+			function initTextures() {
+				gl.addTexture("textures/cobblestone.jpg",shaderProgram.colorTexture,true);
+				gl.addTexture("textures/cobblestone_norma.jpg",shaderProgram.normalTexture,true);
+				gl.addTexture("textures/cobblestone_disp.jpg",shaderProgram.bumpTexture,true);
+				gl.addTexture("textures/cobblestone_spec.jpg",shaderProgram.specTexture,true);
+			}
+			function initBuffers() {
+				var vertices = [
+					1.0, -1.0,  -1.0,
+					-1.0, -1.0,  -1.0,
+					-1.0,  1.0,  -1.0,
+
+					1.0, 1.0,  -1.0,
+					1.0, -1.0,  -1.0,
+					-1.0,  1.0,  -1.0,
+
+
+					-1.0, -1.0,  1.0,
+					1.0, -1.0,  1.0,
+					1.0,  1.0,  1.0,
+
+					-1.0, 1.0,  1.0,
+					-1.0, -1.0,  1.0,
+					1.0,  1.0,  1.0,
+
+
+					-1.0, 1.0,  -1.0,
+					-1.0, -1.0,  -1.0,
+					-1.0,  -1.0,  1.0,
+
+					-1.0, 1.0,  1.0,
+					-1.0, 1.0,  -1.0,
+					-1.0,  -1.0,  1.0,
+
+
+					1.0, -1.0,  -1.0,
+					1.0, 1.0,  -1.0,
+					1.0,  1.0,  1.0,
+
+					1.0, -1.0,  1.0,
+					1.0, -1.0,  -1.0,
+					1.0,  1.0,  1.0,
+
+
+					1.0,  1.0, -1.0,
+					-1.0,  1.0, -1.0,
+					-1.0, 1.0,  1.0,
+
+					1.0, 1.0,  1.0,
+					1.0, 1.0, -1.0,
+					-1.0, 1.0,  1.0,
+
+
+					-1.0, -1.0,  -1.0,
+					1.0, -1.0,  -1.0,
+					1.0, -1.0,  1.0,
+
+					-1.0, -1.0,  1.0,
+					-1.0, -1.0,  -1.0,
+					 1.0, -1.0,  1.0,
+
+
+					2.0,  0.0, -2.0,
+					-2.0,  0.0, -2.0,
+					-2.0, 0.0,  2.0,
+
+					2.0, 0.0,  2.0,
+					2.0, 0.0, -2.0,
+					-2.0, 0.0,  2.0,
+				];
+				gl.addBuffer(vertices,3,shaderProgram.vertexPositionAttribute);
+
+				var normals = [
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+
+
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+
+
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+
+
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+
+
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+
+
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+				];
+				gl.addBuffer(normals,3,shaderProgram.vertexNormalAttribute);
+
+				var texmap = [
+					2.0, 0.0,
+					0.0, 0.0,
+					0.0,  2.0,
+
+					2.0, 2.0,
+					2.0, 0.0,
+					0.0,  2.0,
+
+
+					0.0, 0.0,
+					2.0, 0.0,
+					2.0,  2.0,
+
+					0.0, 2.0,
+					0.0, 0.0,
+					2.0,  2.0,
+
+
+					2.0,  0.0,
+					0.0,  0.0,
+					0.0,  2.0,
+
+					2.0,  2.0,
+					2.0,  0.0,
+					 0.0,  2.0,
+
+
+					 0.0,  0.0,
+					 2.0,  0.0,
+					  2.0,  2.0,
+
+					 0.0,  2.0,
+					 0.0,  0.0,
+					  2.0,  2.0,
+
+
+					2.0,  0.0,
+					0.0,  0.0,
+					0.0,   2.0,
+
+					2.0,   2.0,
+					2.0,  0.0,
+					0.0,  2.0,
+
+
+					0.0,   0.0,
+					2.0,   0.0,
+					2.0,  2.0,
+
+					0.0,   2.0,
+					0.0,   0.0,
+					 2.0,   2.0,
+
+					2.0,  0.0,
+					0.0,  0.0,
+					0.0,   2.0,
+
+					2.0,   2.0,
+					2.0,  0.0,
+					0.0,  2.0,
+				];
+				gl.addBuffer(texmap,2,shaderProgram.vertexTexmapAttribute);
+
+				var tangents = [];
+				var binormals = [];
+				for ( var i=0; i<vertices.length; i+=9){
+					var v00 = vertices[i+0];
+					var v01 = vertices[i+1];
+					var v02 = vertices[i+2];
+					var v10 = vertices[i+3];
+					var v11 = vertices[i+4];
+					var v12 = vertices[i+5];
+					var v20 = vertices[i+6];
+					var v21 = vertices[i+7];
+					var v22 = vertices[i+8];
+
+					// Shortcuts for UVs
+					var uv00 = texmap[i/3*2+0];
+					var uv01 = texmap[i/3*2+1];
+					var uv10 = texmap[i/3*2+2];
+					var uv11 = texmap[i/3*2+3];
+					var uv20 = texmap[i/3*2+4];
+					var uv21 = texmap[i/3*2+5];
+
+					// Edges of the triangle : postion delta
+					var deltaPos10 = v10-v00;
+					var deltaPos11 = v11-v01;
+					var deltaPos12 = v12-v02;
+					var deltaPos20 = v20-v00;
+					var deltaPos21 = v21-v01;
+					var deltaPos22 = v22-v02;
+
+					// UV delta
+					var deltaUV10 = uv10-uv00;
+					var deltaUV11 = uv11-uv01;
+					var deltaUV20 = uv20-uv00;
+					var deltaUV21 = uv21-uv01;
+					var r = 1.0 / (deltaUV10 * deltaUV21 - deltaUV11 * deltaUV20);
+					var tangent0 = (deltaPos10 * deltaUV21   - deltaPos20 * deltaUV11)*r;
+					var tangent1 = (deltaPos11 * deltaUV21   - deltaPos21 * deltaUV11)*r;
+					var tangent2 = (deltaPos12 * deltaUV21   - deltaPos22 * deltaUV11)*r;
+					tangents.push(tangent0);
+					tangents.push(tangent1);
+					tangents.push(tangent2);
+					tangents.push(tangent0);
+					tangents.push(tangent1);
+					tangents.push(tangent2);
+					tangents.push(tangent0);
+					tangents.push(tangent1);
+					tangents.push(tangent2);
+					var binormal0 = (deltaPos20 * deltaUV10   - deltaPos10 * deltaUV20)*r;
+					var binormal1 = (deltaPos21 * deltaUV10   - deltaPos11 * deltaUV20)*r;
+					var binormal2 = (deltaPos22 * deltaUV10   - deltaPos12 * deltaUV20)*r;
+					binormals.push(binormal0);
+					binormals.push(binormal1);
+					binormals.push(binormal2);
+					binormals.push(binormal0);
+					binormals.push(binormal1);
+					binormals.push(binormal2);
+					binormals.push(binormal0);
+					binormals.push(binormal1);
+					binormals.push(binormal2);
+				}
+				gl.addBuffer(tangents,3,shaderProgram.vertexTangentAttribute);
+				gl.addBuffer(binormals,3,shaderProgram.vertexBinormalAttribute);
+			}
+			var angleX=0.0;
+			var angleY=0.0;
+			var paralaxSlider;
+			var radios;
+			var correctionBox;
+			function drawScene() {
+				gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+				mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+				mat4.identity(mvMatrix);
+				mat4.translate(mvMatrix, [0.0,  0.0,-3.0]);
+				mat4.rotateX(mvMatrix, -1.57079632679+angleY);
+				mat4.rotateZ(mvMatrix, angleX+3.14);
+				parallax=paralaxSlider.value*1.0/400;
+				for (var i = 0, length = radios.length; i < length; i++) {
+					if (radios[i].checked) {
+						mode=radios[i].value;
+						break;
+					}
+				}
+				gammaCorrection=correctionBox.checked?1:0;
+				setUniforms();
+				gl.drawBuffers();
+			}
+			function tick(){
+				requestAnimFrame(tick);
+				drawScene();
+			}
+			function webGLStart() {
+				var canvas = document.getElementById("canvas");
+				paralaxSlider=document.getElementById("parallax");
+				radios=document.getElementsByName('mode');
+				correctionBox=document.getElementById('correction');
+				canvas.onmousedown = handleMouseDown;
+				document.onmouseup = handleMouseUp;
+				document.onmousemove = handleMouseMove;
+				canvas.ontouchstart = function(e){
+					if(e.preventDefault)
+						e.preventDefault();
+					handleMouseDown(e.changedTouches[0]);
+				};
+				canvas.ontouchend = function(e){
+					if(e.preventDefault)
+						e.preventDefault();
+					handleMouseUp(e.changedTouches[0]);
+				};
+				canvas.ontouchmove = function(e){
+					if(e.preventDefault)
+						e.preventDefault();
+					handleMouseMove(e.changedTouches[0]);
+				};
+				gl = initGL(canvas);
+				initShaders();
+				initBuffers();
+				initTextures();
+				gl.clearColor(0.0, 0.0, 0.0, 1.0);
+				gl.enable(gl.CULL_FACE);
+				gl.enable(gl.DEPTH_TEST);
+				tick();
+			}
+			var mouseDown = false;
+			var lastMouseX = null;
+			var lastMouseY = null;
+			function handleMouseDown(event) {
+				if(event.preventDefault)
+					event.preventDefault();
+				mouseDown = true;
+				lastMouseX = event.clientX;
+				lastMouseY = event.clientY;
+				return false;
+			}
+
+			function handleMouseUp(event) {
+				mouseDown = false;
+			}
+
+			function handleMouseMove(event) {
+				if (!mouseDown) {
+					return;
+				}
+				var newX = event.clientX;
+				var newY = event.clientY;
+
+				var deltaX = newX - lastMouseX;
+				var deltaY = newY - lastMouseY;
+
+				angleX+=deltaX / 573.0;
+				angleY+=deltaY / 573.0;
+
+				lastMouseX = newX
+				lastMouseY = newY;
+			}
+		</script>
+
+	</body>
+</html>
