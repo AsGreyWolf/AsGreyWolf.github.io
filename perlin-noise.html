@@ -2,20 +2,64 @@
 <html>
 	<body onload="webGLStart();" style="width:100%; height:100%;">
 		<center><canvas id="canvas" style="border: none;" width="1024px" height="768px"></canvas><br>
-		<input type="range" id="parallax" value="0"><br>
-		<input type="radio" name="mode" value="0" checked> Simple parallax<br>
-		<input type="radio" name="mode" value="1" > Steep Parallax<br>
-		<input type="radio" name="mode" value="2" > Parallax Occlusion<br>
-		<input type="checkbox" id="correction" value="1" > sRGB Gamma Correction<br></center>
 
 		<script type="text/javascript" src="gltools.js"></script>
 		<script type="text/javascript" src="gl.js"></script>
 		<script id="shader-fs" type="x-shader/x-fragment">
 			precision highp float;
 			varying vec2 texmap;
-
+			uniform float size;
+			float rand(vec2 co){
+				return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+			}
+			float linear(float a, float b, float t){
+				return a + (b - a) * t;
+			}
+			float bilinear(float tl, float tr, float bl, float br, float x, float y){
+				return linear(linear(tl, tr, x), linear(bl, br, x), y);
+			}
+			float quintic(float t){
+				return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+			}
+			float biquintic(float tl, float tr, float bl, float br, float x, float y){
+				return bilinear(tl, tr, bl, br, quintic(x), quintic(y));
+			}
+			vec2 gridCell(vec2 x){
+				return floor(x);
+			}
+			vec2 randV(vec2 c){
+				float r = rand(c*0.005);
+				if(r<0.25) return vec2(0,1);
+				if(r<0.5) return vec2(0,-1);
+				if(r<0.75) return vec2(1,0);
+				return vec2(-1,0);
+			}
+			float perlin(vec2 c){
+				vec2 cell = gridCell(c);
+				vec2 dc = c-cell;
+				float tl = dot(dc, randV(cell));
+				float tr = dot(vec2(dc.x-1.0, dc.y), randV(vec2(cell.x+1.0,cell.y)));
+				float bl = dot(vec2(dc.x, dc.y-1.0), randV(vec2(cell.x,cell.y+1.0)));
+				float br = dot(vec2(dc.x-1.0, dc.y-1.0), randV(vec2(cell.x+1.0,cell.y+1.0)));
+				return biquintic(tl, tr, bl, br, dc.x, dc.y);
+			}
+			float perlin5(vec2 c){
+				float amplitude = 1.0;
+				float v = 0.0;
+				float m = 0.0;
+				for(int i=0;i<5;i++){
+					v+=perlin(c)*amplitude;
+					m+=amplitude;
+					amplitude/=2.0;
+					c*=2.0;
+				}
+				return v/m;
+			}
 			void main(void) {
-				gl_FragColor = vec4(1.0,0.0,0.0,1.0);
+				float size = 0.03+0.1*coeff();
+				vec2 uv = texmap *1024.0/size;
+				float v = perlin5(uv)*0.5+0.5;
+				gl_FragColor = vec4(v,v,v,1.0);
 			}
 		</script>
 		<script id="shader-vs" type="x-shader/x-vertex">
@@ -32,6 +76,7 @@
 			"use strict";
 			var gl;
 			var shaderProgram;
+			var size = 1.0;
 			function initShaders() {
 				var fragmentShader = gl.getShader(gl, "shader-fs");
 				var vertexShader = gl.getShader(gl, "shader-vs");
@@ -47,8 +92,10 @@
 				gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
 				shaderProgram.vertexTexmapAttribute = gl.getAttribLocation(shaderProgram, "aVertexTexmap");
 				gl.enableVertexAttribArray(shaderProgram.vertexTexmapAttribute);
+				shaderProgram.size = gl.getUniformLocation(shaderProgram,"size");
 			}
 			function setUniforms() {
+				gl.uniform1f(shaderProgram.size, size);
 			}
 			function initBuffers() {
 				var vertices = [
