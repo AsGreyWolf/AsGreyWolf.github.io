@@ -2,6 +2,7 @@
 <html>
 	<body onload="webGLStart();" style="width:100%; height:100%;">
 		<center><canvas id="canvas" style="border: none;" width="1024px" height="768px"></canvas><br>
+		<input type="range" id="size" value="0"><br>
 
 		<script type="text/javascript" src="gltools.js"></script>
 		<script type="text/javascript" src="gl.js"></script>
@@ -119,9 +120,12 @@
 				];
 				gl.addBuffer(texmap,2,shaderProgram.vertexTexmapAttribute);
 			}
+			var sizeSlider;
 			function drawScene() {
 				gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+				size=sizeSlider.value*5.0;
 
 				setUniforms();
 				gl.drawBuffers();
@@ -131,6 +135,7 @@
 				drawScene();
 			}
 			function webGLStart() {
+				sizeSlider=document.getElementById("size");
 				gl = initGL(canvas);
 				initShaders();
 				initBuffers();
