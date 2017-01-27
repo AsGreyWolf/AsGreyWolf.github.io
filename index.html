@@ -1,8 +1,272 @@
+<!DOCTYPE html>
 <html>
-<head>
-
-</head>
-<body>
-	<h1>Test page</h1>
-</body>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>asgreywolf.ru</title>
+		<link href='https://fonts.googleapis.com/css?family=Roboto:700,400,300,500,100&subset=latin,cyrillic' rel='stylesheet' type='text/css'>
+		<style type="text/css">
+			html, body {
+				margin: 0% !important;
+				padding: 0% !important;
+				min-width: 100% !important;
+				min-height: 100% !important;
+			}
+			body {
+				font-family: Roboto;
+				color: rgba(0,0,0,0.87);
+				background-color: #E0E0E0;
+				-webkit-font-smoothing: antialiased;
+			}
+			a {
+				color: rgba(41,98,255,1.0);
+				text-decoration: none;
+			}
+			a:hover {
+				cursor: pointer;
+				text-decoration: underline;
+			}
+			.dark {
+				color: #FFFFFF;
+			}
+			.dark a, .dark > a {
+				color: rgba(130,177,255,1.0);
+			}
+			h1,h2,h3,h4,h5,h6 {
+				font-family: 'Roboto Light';
+				font-weight: normal;
+			}
+			h1 {
+				font-size: 2em;
+				margin: 0% 0% 2% 0%;
+			}
+			h2 {
+				font-size: 1.5em;
+				margin: 2% 0% 2% 0%;
+			}
+			nav {
+				padding: 0%;
+				margin: 0%;
+				min-width: 300px;
+				text-align: center;
+			}
+			nav > ul {
+				padding: 0%;
+				margin: 0%;
+				min-width: 100%;
+				min-height: 100%;
+				display: block;
+				background-color: #FF9800;
+			}
+			nav > ul > li {
+				padding : 0% 5% 0% 5%;
+				margin: 0%;
+				min-height: 300%;
+				line-height: 300%;
+				display: block;
+				vertical-align: center;
+			}
+			nav > ul > li > a {
+				min-height: 100%;
+				min-width: 100%;
+				display: block;
+				color: #FFFFFF !important;
+				text-decoration: none !important;
+				font-weight: 700;
+			}
+			nav > ul > li > a:hover {
+				color: #FFFFFF !important;
+				text-decoration: none !important;
+			}
+			nav > ul > li > a::after {
+				content: "";
+				min-width: 100%;
+				min-height: 3px;
+				position: relative;
+				left: 0%;
+				bottom: 0%;
+				display: block;
+				background-color: #448AFF;
+				visibility: hidden;
+			}
+			nav > ul > li > a:hover::after {
+				visibility: visible;
+			}
+			section {
+				margin: 0%;
+				padding: 3%;
+			}
+			footer {
+				display: block;
+				background-color: #F57C00;
+				width: 100%;
+			}
+			article {
+				background-color: #FAFAFA;
+				padding: 5% 5% 5% 5%;
+				margin-bottom: 3%;
+			}
+			article:last-of-type {
+				margin-bottom: 0%;
+			}
+			iframe {
+				display: block;
+				text-align: center;
+				width: 100%;
+			}
+			.circle {
+				width: 70px;
+				height: 70px;
+				vertical-align: middle;
+				border-radius: 35px;
+				margin: 0% 2% 0% 0%;
+			}
+			.small-circle {
+				width: 50px;
+				height: 50px;
+				vertical-align: middle;
+				border-radius: 25px;
+				margin: 0% 1% 0% 0%;
+			}
+			main {
+				flex-grow: 1;
+			}
+			.fill {
+				justify-content: space-between !important;
+			}
+			vertical, .vertical {
+				display: flex;
+				flex-direction: column;
+				flex-wrap: nowrap;
+				justify-content: space-around;
+				align-item: stretch;
+				align-content: center;
+			}
+			horizontal, .horizontal {
+				display: flex;
+				flex-direction: row;
+				flex-wrap: nowrap;
+				justify-content: space-around;
+				align-item: stretch;
+				align-content: center;
+			}
+			adaptive, .adaptive {
+				display: flex;
+				flex-direction: column;
+				flex-wrap: nowrap;
+				justify-content: space-around;
+				align-item: stretch;
+				align-content: center;
+			}
+			adaptive-inverse, .adaptive-inverse {
+				display: flex;
+				flex-direction: row;
+				flex-wrap: nowrap;
+				justify-content: space-around;
+				align-item: stretch;
+				align-content: center;
+			}
+			@media (max-width: 600px) {
+				adaptive-inverse, .adaptive-inverse {
+					flex-direction: column;
+				}
+			}
+			@media (min-width: 900px) {
+				adaptive, .adaptive {
+					flex-direction: row;
+				}
+				adaptive-inverse, .adaptive-inverse {
+					flex-direction: column;
+					justify-content: flex-start;
+				}
+			}
+			.z1 {
+				box-shadow: 0px 0px 1px 2px rgba(0,0,0,0.09);
+				z-index: 1;
+				position: relative;
+			}
+			.z2 {
+				box-shadow: 0px 0px 3px 4px rgba(0,0,0,0.11);
+				z-index: 2;
+				position: relative;
+			}
+			.z3 {
+				box-shadow: 0px 0px 5px 6px rgba(0,0,0,0.13);
+				z-index: 3;
+				position: relative;
+			}
+			.z4 {
+				box-shadow: 0px 0px 7px 8px rgba(0,0,0,0.15);
+				z-index: 4;
+				position: relative;
+			}
+		</style>
+	</head>
+	<body>
+		<adaptive class="fill">
+			<nav class="dark">
+				<ul class="z4 adaptive-inverse">
+					<li><a href="parallax.html">Parallax Test</a></li>
+					<!-- <li><a href="nma.html">Алгорифмы Маркова</a></li> -->
+				</ul>
+			</nav>
+			<main>
+				<vertical class="fill">
+				<section class="vertical fill">
+					<article class="z2" id="content">
+						<h1><img src="images/av.jpg" class="z1 circle" />Обо мне</h1>
+						<a href="https://vk.com/asschool"><img src="images/vk.png" class="z1 small-circle" /> vk.com/asschool</a><br/>
+						<a href="https://github.com/AsGreyWolf"><img src="images/Octocat.jpg" class="z1 small-circle" /> github.com/AsGreyWolf</a><br/>
+						<a href="https://habrahabr.ru/users/asgreywolf/"><img src="https://habracdn.net/habr/images/1470138331/logo.svg?r=2" class="z1 small-circle" /> habrahabr.ru/users/asgreywolf/</a><br/>
+						<a href="https://geektimes.ru/users/asgreywolf/"><img src="https://habracdn.net/gt/images/1470138319/logo.svg?r=2" class="z1 small-circle" /> geektimes.ru/users/asgreywolf/</a><br/>
+					</br/>
+					</article>
+					<article class="z2" id="content">
+						<h1><img src="https://lh3.googleusercontent.com/-3RYWQV4Fl1k/UkQGbhTuVLI/AAAAAAAAAXU/rSORXkth5IY/w320-h240-no/screen6.png" class="z1 circle" />Teeworlds3d</h1>
+						Teeworlds3d
+						<iframe width="560" height="315" src="https://www.youtube.com/embed/8YWLtAGKhO4?rel=0&amp;showinfo=0" frameborder="0" allowfullscreen></iframe>
+					</article>
+				</section>
+				<footer>
+					<section class="dark z3">
+						© Айдар Фаттахов 2016
+					</section>
+				</footer>
+				</vertical>
+			</main>
+		</adaptive>
+		<script>
+			function loaded(l, data) {
+				window.history.replaceState({url:l}, document.title, l);
+				document.getElementById('content').innerHTML = data;
+				sync();
+			}
+			function locate(l) {
+				xmlhttp = new XMLHttpRequest();
+				xmlhttp.onreadystatechange = function()
+				{
+					if(xmlhttp.readyState == 4 && xmlhttp.status == 200)
+					{
+						loaded(l, xmlhttp.responseText);
+					}
+				}
+				xmlhttp.open('GET', l, true);
+				xmlhttp.send();
+			}
+			function sync() {
+				var links = document.getElementsByTagName('a');
+				for(var i = 0; i < links.length; i++) {
+					if(links[i].getAttribute('sync')!==1){
+						links[i].setAttribute('sync', 1);
+						var oncl = links[i].onclick;
+						links[i].onclick=function(e) {
+							(oncl != null && oncl(e)) || locate(this.href);
+							return false;
+						};
+					}
+				}
+			}
+			//sync();
+		</script>
+	</body>
 </html>
