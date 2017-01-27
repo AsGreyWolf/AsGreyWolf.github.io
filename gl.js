@@ -56,7 +56,8 @@ function addTexture(src, uniform, filter = false) {
 	texture.image = new Image();
 	texture.image.onload = function() {
 		handleLoadedTexture(texture, filter)
-	} texture.image.src = src;
+	};
+	texture.image.src = src;
 	texture.uniform = uniform;
 	textures.push(texture);
 }
