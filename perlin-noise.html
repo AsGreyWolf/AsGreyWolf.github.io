@@ -125,7 +125,7 @@
 				gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-				size=sizeSlider.value*5.0;
+				size=sizeSlider.value*5.0+1;
 
 				setUniforms();
 				gl.drawBuffers();
