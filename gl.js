@@ -1,5 +1,3 @@
-
-
 "use strict";
 function getShader(gl, id) {
 	var shaderScript = document.getElementById(id);
@@ -85,4 +83,22 @@ function drawBuffers() {
 		                       false, 0, 0);
 	}
 	gl.drawArrays(gl.TRIANGLES, 0, buffers[0].numItems);
+}
+
+function initGL(canvas) {
+	var gl;
+	try {
+		gl = WebGLUtils.setupWebGL(canvas);
+		gl.viewportWidth = canvas.width;
+		gl.viewportHeight = canvas.height;
+	} catch (e) {
+	}
+	if (!gl) {
+		alert("Could not initialise WebGL, sorry :-(");
+	}
+	gl.drawBuffers=drawBuffers;
+	gl.addBuffer=addBuffer;
+	gl.addTexture=addTexture;
+	gl.getShader=getShader;
+	return gl;
 }
