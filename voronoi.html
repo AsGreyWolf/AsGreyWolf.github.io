@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+	<body onload="webGLStart();" style="width:100%; height:100%;">
+		<center><canvas id="canvas" style="border: none;" width="1024px" height="768px"></canvas><br>
+		<input type="range" id="size" value="0"><br>
+
+		<script type="text/javascript" src="gltools.js"></script>
+		<script type="text/javascript" src="gl.js"></script>
+		<script id="shader-fs" type="x-shader/x-fragment">
+			precision highp float;
+			varying vec2 texmap;
+			uniform float size;
+			float rand(vec2 co){
+				return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+			}
+			const int max = 1024;
+			vec2 randV(int i){
+				vec2 co1 = vec2(float(i)/float(max), 0.0);
+				vec2 co2 = vec2(co1.x, 0.5);
+				return vec2(rand(co1), rand(co2));
+			}
+			vec2 findNearest(vec2 c, int block){
+				float mindist = -1.0;
+				vec2 nearest;
+				for(int i=0;i<=max;i++){
+					if(i>block) break;
+					vec2 v = randV(i);
+					float dist = distance(v, c);
+					if(mindist < 0.0 || mindist > dist){
+						mindist = dist;
+						nearest = v;
+					}
+				}
+				return nearest;
+			}
+			void main(){
+				float v = rand(findNearest(texmap,int(size*float(max))));
+				gl_FragColor = vec4(v,v,v,1.0);
+			}
+		</script>
+		<script id="shader-vs" type="x-shader/x-vertex">
+			attribute vec3 aVertexPosition;
+			attribute vec2 aVertexTexmap;
+			varying vec2 texmap;
+
+			void main(void) {
+				texmap=aVertexTexmap;
+				gl_Position = vec4(aVertexPosition, 1.0);
+			}
+		</script>
+		<script type="text/javascript">
+			"use strict";
+			var gl;
+			var shaderProgram;
+			var size = 1.0;
+			function initShaders() {
+				var fragmentShader = gl.getShader(gl, "shader-fs");
+				var vertexShader = gl.getShader(gl, "shader-vs");
+				shaderProgram = gl.createProgram();
+				gl.attachShader(shaderProgram, vertexShader);
+				gl.attachShader(shaderProgram, fragmentShader);
+				gl.linkProgram(shaderProgram);
+				if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+					alert("Could not initialise shaders");
+				}
+				gl.useProgram(shaderProgram);
+				shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+				gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+				shaderProgram.vertexTexmapAttribute = gl.getAttribLocation(shaderProgram, "aVertexTexmap");
+				gl.enableVertexAttribArray(shaderProgram.vertexTexmapAttribute);
+				shaderProgram.size = gl.getUniformLocation(shaderProgram,"size");
+			}
+			function setUniforms() {
+				gl.uniform1f(shaderProgram.size, size);
+			}
+			function initBuffers() {
+				var vertices = [
+					-1.0, -1.0,  0.0,
+					1.0, -1.0,  0.0,
+					-1.0,  1.0,  0.0,
+
+					1.0, -1.0,  0.0,
+					1.0, 1.0,  0.0,
+					-1.0,  1.0,  0.0,
+				];
+				gl.addBuffer(vertices,3,shaderProgram.vertexPositionAttribute);
+
+				var texmap = [
+					0.0,0.0,
+					1.0,0.0,
+					0.0,1.0,
+
+					1.0,0.0,
+					1.0,1.0,
+					0.0,1.0,
+				];
+				gl.addBuffer(texmap,2,shaderProgram.vertexTexmapAttribute);
+			}
+			var sizeSlider;
+			function drawScene() {
+				gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+				size=sizeSlider.value/100.0;
+
+				setUniforms();
+				gl.drawBuffers();
+			}
+			function tick(){
+				requestAnimFrame(tick);
+				drawScene();
+			}
+			function webGLStart() {
+				sizeSlider=document.getElementById("size");
+				gl = initGL(canvas);
+				initShaders();
+				initBuffers();
+				gl.clearColor(0.0, 0.0, 0.0, 1.0);
+				gl.enable(gl.CULL_FACE);
+				tick();
+			}
+		</script>
+
+	</body>
+</html>
