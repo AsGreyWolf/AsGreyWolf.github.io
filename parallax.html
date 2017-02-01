@@ -561,11 +561,11 @@
 
 				renderer = new Renderer(gl);
 				initBuffers();
-				renderer.addTexture("textures/cobblestone.jpg",true);
-				renderer.addTexture("textures/cobblestone_norma.jpg",true);
-				renderer.addTexture("textures/cobblestone_disp.jpg",true);
-				renderer.addTexture("textures/cobblestone_spec.jpg",true);
-				
+				renderer.addTexture(new Texture(loadImage("textures/cobblestone.jpg"), gl, true));
+				renderer.addTexture(new Texture(loadImage("textures/cobblestone_norma.jpg"), gl,true));
+				renderer.addTexture(new Texture(loadImage("textures/cobblestone_disp.jpg"), gl,true));
+				renderer.addTexture(new Texture(loadImage("textures/cobblestone_spec.jpg"), gl,true));
+
 				tick();
 			}
 			var mouseDown = false;

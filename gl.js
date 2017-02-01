@@ -14,20 +14,21 @@ function initGL(canvas) {
 	return gl;
 }
 
-function Renderer(gl) {
+function loadImage(url) {
+	var image = new Image();
+	image.src = url;
+}
+
+function Texture(image, gl, filter = false) {
 	this.gl = gl;
-	this.buffers = [];
-	this.textures = [];
-};
-Renderer.prototype.addTexture = function(src, filter = false) {
-	var gl = this.gl;
-	var texture = gl.createTexture();
-	texture.image = new Image();
-	texture.image.onload = function() {
-		gl.bindTexture(gl.TEXTURE_2D, texture);
+	var id = gl.createTexture();
+	this.id = id;
+	this.image = image;
+	var onload = function() {
+		gl.bindTexture(gl.TEXTURE_2D, id);
 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE,
-		              texture.image);
+		              image);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER,
@@ -45,7 +46,21 @@ Renderer.prototype.addTexture = function(src, filter = false) {
 			gl.generateMipmap(gl.TEXTURE_2D);
 		gl.bindTexture(gl.TEXTURE_2D, null);
 	};
-	texture.image.src = src;
+	if(this.image)
+		this.image.onload = onload;
+	else
+		onload();
+}
+Texture.prototype.bind = function(){
+	this.gl.bindTexture(this.gl.TEXTURE_2D, this.id);
+};
+
+function Renderer(gl) {
+	this.gl = gl;
+	this.buffers = [];
+	this.textures = [];
+}
+Renderer.prototype.addTexture = function(texture) {
 	this.textures.push(texture);
 };
 Renderer.prototype.addBuffer = function(data, itemSize, attribute){
@@ -64,7 +79,7 @@ Renderer.prototype.draw = function(){
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	for (var i = 0; i < this.textures.length; i++) {
 		gl.activeTexture(gl.TEXTURE0 + i);
-		gl.bindTexture(gl.TEXTURE_2D, this.textures[i]);
+		this.textures[i].bind();
 	}
 	for (var i = 0; i < this.buffers.length; i++) {
 		if(this.buffers[i].attribute<0) continue;
