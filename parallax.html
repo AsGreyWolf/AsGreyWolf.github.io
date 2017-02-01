@@ -7,7 +7,7 @@
 		<input type="radio" name="mode" value="1" > Steep Parallax<br>
 		<input type="radio" name="mode" value="2" > Parallax Occlusion<br>
 		<input type="checkbox" id="correction" value="1" > sRGB Gamma Correction<br></center>
-		
+
 		<script type="text/javascript" src="gltools.js"></script>
 		<script type="text/javascript" src="gl.js"></script>
 		<script id="shader-fs" type="x-shader/x-fragment">
@@ -219,61 +219,29 @@
 		</script>
 		<script type="text/javascript">
 			"use strict";
-			var gl;
-			var shaderProgram;
-			function initShaders() {
-				var fragmentShader = gl.getShader(gl, "shader-fs");
-				var vertexShader = gl.getShader(gl, "shader-vs");
-				shaderProgram = gl.createProgram();
-				gl.attachShader(shaderProgram, vertexShader);
-				gl.attachShader(shaderProgram, fragmentShader);
-				gl.linkProgram(shaderProgram);
-				if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-					alert("Could not initialise shaders");
-				}
-				gl.useProgram(shaderProgram);
-				shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
-				gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
-				shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
-				gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
-				shaderProgram.vertexTexmapAttribute = gl.getAttribLocation(shaderProgram, "aVertexTexmap");
-				gl.enableVertexAttribArray(shaderProgram.vertexTexmapAttribute);
-				shaderProgram.vertexTangentAttribute = gl.getAttribLocation(shaderProgram, "aVertexTangent");
-				gl.enableVertexAttribArray(shaderProgram.vertexTangentAttribute);
-				shaderProgram.vertexBinormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexBinormal");
-				gl.enableVertexAttribArray(shaderProgram.vertexBinormalAttribute);
-				shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
-				shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
-				shaderProgram.nmvMatrixUniform = gl.getUniformLocation(shaderProgram, "uNMVMatrix");
-				shaderProgram.colorTexture = gl.getUniformLocation(shaderProgram, "colorTexture");
-				shaderProgram.normalTexture = gl.getUniformLocation(shaderProgram, "normalTexture");
-				shaderProgram.bumpTexture = gl.getUniformLocation(shaderProgram, "bumpTexture");
-				shaderProgram.specTexture = gl.getUniformLocation(shaderProgram, "specTexture");
-				shaderProgram.parallax=gl.getUniformLocation(shaderProgram,"height_scale");
-				shaderProgram.gammaCorrection = gl.getUniformLocation(shaderProgram, "gammaCorrection");
-				shaderProgram.mode=gl.getUniformLocation(shaderProgram,"mode");
-			}
-			var mvMatrix = mat4.create();
-			var pMatrix = mat4.create();
-			var parallax=0.0;
-			var mode=0;
-			var gammaCorrection=0;
-			function setUniforms() {
-				gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
-				gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+			function setUniforms(shaderProgram) {
+				var pMatrix = mat4.create();
+				mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+				gl.uniformMatrix4fv(shaderProgram.uPMatrix, false, pMatrix);
+				var mvMatrix = mat4.create();
+				mat4.identity(mvMatrix);
+				mat4.translate(mvMatrix, [0.0,  0.0,-3.0]);
+				mat4.rotateX(mvMatrix, -1.57079632679+angleY);
+				mat4.rotateZ(mvMatrix, angleX+3.14);
+				gl.uniformMatrix4fv(shaderProgram.uMVMatrix, false, mvMatrix);
 				var nmvMatrix=mvMatrix;
 				mat4.inverse(nmvMatrix);
 				mat4.transpose(nmvMatrix);
-				gl.uniformMatrix4fv(shaderProgram.nmvMatrixUniform, false, nmvMatrix);
-				gl.uniform1f(shaderProgram.parallax, parallax);
-				gl.uniform1i(shaderProgram.mode, mode);
-				gl.uniform1i(shaderProgram.gammaCorrection, gammaCorrection);
-			}
-			function initTextures() {
-				gl.addTexture("textures/cobblestone.jpg",shaderProgram.colorTexture,true);
-				gl.addTexture("textures/cobblestone_norma.jpg",shaderProgram.normalTexture,true);
-				gl.addTexture("textures/cobblestone_disp.jpg",shaderProgram.bumpTexture,true);
-				gl.addTexture("textures/cobblestone_spec.jpg",shaderProgram.specTexture,true);
+				gl.uniformMatrix4fv(shaderProgram.uNMVMatrix, false, nmvMatrix);
+
+				gl.uniform1f(shaderProgram.height_scale, paralaxSlider.value*1.0/400);
+				for (var i = 0, length = radios.length; i < length; i++) {
+					if (radios[i].checked) {
+						gl.uniform1i(shaderProgram.mode, radios[i].value);
+						break;
+					}
+				}
+				gl.uniform1i(shaderProgram.gammaCorrection, correctionBox.checked?1:0);
 			}
 			function initBuffers() {
 				var vertices = [
@@ -339,7 +307,7 @@
 					2.0, 0.0, -2.0,
 					-2.0, 0.0,  2.0,
 				];
-				gl.addBuffer(vertices,3,shaderProgram.vertexPositionAttribute);
+				renderer.addBuffer(vertices,3,shaderProgram.aVertexPosition);
 
 				var normals = [
 					0.0, 0.0, -1.0,
@@ -403,7 +371,7 @@
 					0.0, 1.0, 0.0,
 					0.0, 1.0, 0.0,
 				];
-				gl.addBuffer(normals,3,shaderProgram.vertexNormalAttribute);
+				renderer.addBuffer(normals,3,shaderProgram.aVertexNormal);
 
 				var texmap = [
 					2.0, 0.0,
@@ -467,7 +435,7 @@
 					2.0,  0.0,
 					0.0,  2.0,
 				];
-				gl.addBuffer(texmap,2,shaderProgram.vertexTexmapAttribute);
+				renderer.addBuffer(texmap,2,shaderProgram.aVertexTexmap);
 
 				var tangents = [];
 				var binormals = [];
@@ -529,37 +497,23 @@
 					binormals.push(binormal1);
 					binormals.push(binormal2);
 				}
-				gl.addBuffer(tangents,3,shaderProgram.vertexTangentAttribute);
-				gl.addBuffer(binormals,3,shaderProgram.vertexBinormalAttribute);
+				renderer.addBuffer(tangents,3,shaderProgram.aVertexTangent);
+				renderer.addBuffer(binormals,3,shaderProgram.aVertexBinormal);
+			}
+
+			var gl;
+			var shaderProgram;
+			var renderer;
+			function tick(){
+				requestAnimFrame(tick);
+				shaderProgram.bind();
+				renderer.draw();
 			}
 			var angleX=0.0;
 			var angleY=0.0;
 			var paralaxSlider;
 			var radios;
 			var correctionBox;
-			function drawScene() {
-				gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-				mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
-				mat4.identity(mvMatrix);
-				mat4.translate(mvMatrix, [0.0,  0.0,-3.0]);
-				mat4.rotateX(mvMatrix, -1.57079632679+angleY);
-				mat4.rotateZ(mvMatrix, angleX+3.14);
-				parallax=paralaxSlider.value*1.0/400;
-				for (var i = 0, length = radios.length; i < length; i++) {
-					if (radios[i].checked) {
-						mode=radios[i].value;
-						break;
-					}
-				}
-				gammaCorrection=correctionBox.checked?1:0;
-				setUniforms();
-				gl.drawBuffers();
-			}
-			function tick(){
-				requestAnimFrame(tick);
-				drawScene();
-			}
 			function webGLStart() {
 				var canvas = document.getElementById("canvas");
 				paralaxSlider=document.getElementById("parallax");
@@ -584,12 +538,32 @@
 					handleMouseMove(e.changedTouches[0]);
 				};
 				gl = initGL(canvas);
-				initShaders();
-				initBuffers();
-				initTextures();
 				gl.clearColor(0.0, 0.0, 0.0, 1.0);
 				gl.enable(gl.CULL_FACE);
 				gl.enable(gl.DEPTH_TEST);
+
+				shaderProgram = new ShaderProgram("shader",gl, setUniforms);
+				shaderProgram.addAttribute("aVertexPosition");
+				shaderProgram.addAttribute("aVertexNormal");
+				shaderProgram.addAttribute("aVertexTexmap");
+				shaderProgram.addAttribute("aVertexTangent");
+				shaderProgram.addAttribute("aVertexBinormal");
+				shaderProgram.addUniform("uPMatrix");
+				shaderProgram.addUniform("uMVMatrix");
+				shaderProgram.addUniform("uNMVMatrix");
+				shaderProgram.addUniform("colorTexture");
+				shaderProgram.addUniform("normalTexture");
+				shaderProgram.addUniform("bumpTexture");
+				shaderProgram.addUniform("specTexture");
+				shaderProgram.addUniform("height_scale");
+				shaderProgram.addUniform("gammaCorrection");
+				shaderProgram.addUniform("mode");
+				renderer = new Renderer(gl);
+				initBuffers();
+				renderer.addTexture("textures/cobblestone.jpg",shaderProgram.colorTexture,true);
+				renderer.addTexture("textures/cobblestone_norma.jpg",shaderProgram.normalTexture,true);
+				renderer.addTexture("textures/cobblestone_disp.jpg",shaderProgram.bumpTexture,true);
+				renderer.addTexture("textures/cobblestone_spec.jpg",shaderProgram.specTexture,true);
 				tick();
 			}
 			var mouseDown = false;
