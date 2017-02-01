@@ -551,19 +551,21 @@
 				shaderProgram.addUniform("uPMatrix");
 				shaderProgram.addUniform("uMVMatrix");
 				shaderProgram.addUniform("uNMVMatrix");
-				shaderProgram.addUniform("colorTexture");
-				shaderProgram.addUniform("normalTexture");
-				shaderProgram.addUniform("bumpTexture");
-				shaderProgram.addUniform("specTexture");
 				shaderProgram.addUniform("height_scale");
 				shaderProgram.addUniform("gammaCorrection");
 				shaderProgram.addUniform("mode");
+				shaderProgram.addTextureUniform("colorTexture");
+				shaderProgram.addTextureUniform("normalTexture");
+				shaderProgram.addTextureUniform("bumpTexture");
+				shaderProgram.addTextureUniform("specTexture");
+
 				renderer = new Renderer(gl);
 				initBuffers();
-				renderer.addTexture("textures/cobblestone.jpg",shaderProgram.colorTexture,true);
-				renderer.addTexture("textures/cobblestone_norma.jpg",shaderProgram.normalTexture,true);
-				renderer.addTexture("textures/cobblestone_disp.jpg",shaderProgram.bumpTexture,true);
-				renderer.addTexture("textures/cobblestone_spec.jpg",shaderProgram.specTexture,true);
+				renderer.addTexture("textures/cobblestone.jpg",true);
+				renderer.addTexture("textures/cobblestone_norma.jpg",true);
+				renderer.addTexture("textures/cobblestone_disp.jpg",true);
+				renderer.addTexture("textures/cobblestone_spec.jpg",true);
+				
 				tick();
 			}
 			var mouseDown = false;

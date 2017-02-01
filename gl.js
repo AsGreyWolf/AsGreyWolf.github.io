@@ -19,7 +19,7 @@ function Renderer(gl) {
 	this.buffers = [];
 	this.textures = [];
 };
-Renderer.prototype.addTexture = function(src, uniform, filter = false) {
+Renderer.prototype.addTexture = function(src, filter = false) {
 	var gl = this.gl;
 	var texture = gl.createTexture();
 	texture.image = new Image();
@@ -46,7 +46,6 @@ Renderer.prototype.addTexture = function(src, uniform, filter = false) {
 		gl.bindTexture(gl.TEXTURE_2D, null);
 	};
 	texture.image.src = src;
-	texture.uniform = uniform;
 	this.textures.push(texture);
 };
 Renderer.prototype.addBuffer = function(data, itemSize, attribute){
@@ -66,19 +65,24 @@ Renderer.prototype.draw = function(){
 	for (var i = 0; i < this.textures.length; i++) {
 		gl.activeTexture(gl.TEXTURE0 + i);
 		gl.bindTexture(gl.TEXTURE_2D, this.textures[i]);
-		gl.uniform1i(this.textures[i].uniform, i);
 	}
 	for (var i = 0; i < this.buffers.length; i++) {
+		if(this.buffers[i].attribute<0) continue;
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers[i]);
 		gl.vertexAttribPointer(this.buffers[i].attribute, this.buffers[i].itemSize, gl.FLOAT,
 		                       false, 0, 0);
 	}
 	gl.drawArrays(gl.TRIANGLES, 0, this.buffers[0].numItems);
+	for (var i = 0; i < this.textures.length; i++) {
+		gl.activeTexture(gl.TEXTURE0 + i);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+	}
 };
 
 function ShaderProgram(name,gl,setUniforms = function(shaderProgram){}){
 	this.gl=gl;
 	this.setUniforms = setUniforms;
+	this.textureUnifroms = [];
 	var getShader = function(id) {
 		var shaderScript = document.getElementById(id);
 		if (!shaderScript) {
@@ -121,6 +125,8 @@ function ShaderProgram(name,gl,setUniforms = function(shaderProgram){}){
 };
 ShaderProgram.prototype.bind = function(){
 	this.gl.useProgram(this.id);
+	for(var i=0;i<this.textureUnifroms.length;i++)
+		gl.uniform1i(this.textureUnifroms[i], i);
 	this.setUniforms(this);
 };
 ShaderProgram.prototype.addAttribute = function(name){
@@ -129,4 +135,8 @@ ShaderProgram.prototype.addAttribute = function(name){
 };
 ShaderProgram.prototype.addUniform = function(name){
 	this[name] = this.gl.getUniformLocation(this.id, name);
+};
+ShaderProgram.prototype.addTextureUniform = function(name){
+	this.addUniform(name);
+	this.textureUnifroms.push(this[name]);
 };
