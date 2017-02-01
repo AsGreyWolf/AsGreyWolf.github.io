@@ -17,6 +17,7 @@ function initGL(canvas) {
 function loadImage(url) {
 	var image = new Image();
 	image.src = url;
+	return image;
 }
 
 function Texture(image, gl, filter = false) {
