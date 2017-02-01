@@ -28,8 +28,7 @@ function Texture(image, gl, filter = false) {
 	var onload = function() {
 		gl.bindTexture(gl.TEXTURE_2D, id);
 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE,
-		              image);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER,
@@ -47,12 +46,12 @@ function Texture(image, gl, filter = false) {
 			gl.generateMipmap(gl.TEXTURE_2D);
 		gl.bindTexture(gl.TEXTURE_2D, null);
 	};
-	if(this.image)
+	if (this.image)
 		this.image.onload = onload;
 	else
 		onload();
 }
-Texture.prototype.bind = function(){
+Texture.prototype.bind = function() {
 	this.gl.bindTexture(this.gl.TEXTURE_2D, this.id);
 };
 
@@ -64,7 +63,7 @@ function Renderer(gl) {
 Renderer.prototype.addTexture = function(texture) {
 	this.textures.push(texture);
 };
-Renderer.prototype.addBuffer = function(data, itemSize, attribute){
+Renderer.prototype.addBuffer = function(data, itemSize, attribute) {
 	var gl = this.gl;
 	var buffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -74,7 +73,7 @@ Renderer.prototype.addBuffer = function(data, itemSize, attribute){
 	buffer.attribute = attribute;
 	this.buffers.push(buffer);
 };
-Renderer.prototype.draw = function(){
+Renderer.prototype.draw = function() {
 	var gl = this.gl;
 	gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -83,10 +82,11 @@ Renderer.prototype.draw = function(){
 		this.textures[i].bind();
 	}
 	for (var i = 0; i < this.buffers.length; i++) {
-		if(this.buffers[i].attribute<0) continue;
+		if (this.buffers[i].attribute < 0)
+			continue;
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers[i]);
-		gl.vertexAttribPointer(this.buffers[i].attribute, this.buffers[i].itemSize, gl.FLOAT,
-		                       false, 0, 0);
+		gl.vertexAttribPointer(this.buffers[i].attribute, this.buffers[i].itemSize,
+		                       gl.FLOAT, false, 0, 0);
 	}
 	gl.drawArrays(gl.TRIANGLES, 0, this.buffers[0].numItems);
 	for (var i = 0; i < this.textures.length; i++) {
@@ -95,8 +95,8 @@ Renderer.prototype.draw = function(){
 	}
 };
 
-function ShaderProgram(name,gl,setUniforms = function(shaderProgram){}){
-	this.gl=gl;
+function ShaderProgram(name, gl, setUniforms = function(shaderProgram) {}) {
+	this.gl = gl;
 	this.setUniforms = setUniforms;
 	this.textureUnifroms = [];
 	var getShader = function(id) {
@@ -127,9 +127,8 @@ function ShaderProgram(name,gl,setUniforms = function(shaderProgram){}){
 			return null;
 		}
 		return shader;
-	}
-	var fragmentShader = getShader(name+"-fs");
-	var vertexShader = getShader(name+"-vs");
+	} var fragmentShader = getShader(name + "-fs");
+	var vertexShader = getShader(name + "-vs");
 	this.id = gl.createProgram();
 	gl.attachShader(this.id, vertexShader);
 	gl.attachShader(this.id, fragmentShader);
@@ -139,20 +138,20 @@ function ShaderProgram(name,gl,setUniforms = function(shaderProgram){}){
 	}
 	this.attribCount = 0;
 };
-ShaderProgram.prototype.bind = function(){
+ShaderProgram.prototype.bind = function() {
 	this.gl.useProgram(this.id);
-	for(var i=0;i<this.textureUnifroms.length;i++)
+	for (var i = 0; i < this.textureUnifroms.length; i++)
 		gl.uniform1i(this.textureUnifroms[i], i);
 	this.setUniforms(this);
 };
-ShaderProgram.prototype.addAttribute = function(name){
+ShaderProgram.prototype.addAttribute = function(name) {
 	this[name] = this.gl.getAttribLocation(this.id, name);
 	this.gl.enableVertexAttribArray(this[name]);
 };
-ShaderProgram.prototype.addUniform = function(name){
+ShaderProgram.prototype.addUniform = function(name) {
 	this[name] = this.gl.getUniformLocation(this.id, name);
 };
-ShaderProgram.prototype.addTextureUniform = function(name){
+ShaderProgram.prototype.addTextureUniform = function(name) {
 	this.addUniform(name);
 	this.textureUnifroms.push(this[name]);
 };
