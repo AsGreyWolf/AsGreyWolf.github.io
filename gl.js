@@ -127,7 +127,8 @@ function ShaderProgram(name, gl, setUniforms = function(shaderProgram) {}) {
 			return null;
 		}
 		return shader;
-	} var fragmentShader = getShader(name + "-fs");
+	};
+	var fragmentShader = getShader(name + "-fs");
 	var vertexShader = getShader(name + "-vs");
 	this.id = gl.createProgram();
 	gl.attachShader(this.id, vertexShader);
@@ -141,7 +142,7 @@ function ShaderProgram(name, gl, setUniforms = function(shaderProgram) {}) {
 ShaderProgram.prototype.bind = function() {
 	this.gl.useProgram(this.id);
 	for (var i = 0; i < this.textureUnifroms.length; i++)
-		gl.uniform1i(this.textureUnifroms[i], i);
+		this.gl.uniform1i(this.textureUnifroms[i], i);
 	this.setUniforms(this);
 };
 ShaderProgram.prototype.addAttribute = function(name) {
