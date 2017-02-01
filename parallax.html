@@ -11,8 +11,6 @@
 		<script type="text/javascript" src="gltools.js"></script>
 		<script type="text/javascript" src="gl.js"></script>
 		<script id="shader-fs" type="x-shader/x-fragment">
-			precision highp float;
-			precision highp sampler2D;
 			varying vec3 pos;
 			varying vec2 texmap;
 			varying vec3 light;
@@ -565,7 +563,7 @@
 				renderer.addTexture("textures/cobblestone_norma.jpg",true);
 				renderer.addTexture("textures/cobblestone_disp.jpg",true);
 				renderer.addTexture("textures/cobblestone_spec.jpg",true);
-				
+
 				tick();
 			}
 			var mouseDown = false;
