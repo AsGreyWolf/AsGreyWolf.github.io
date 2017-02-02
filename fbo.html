@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html>
+	<body onload="webGLStart();" style="width:100%; height:100%;">
+		<center><canvas id="canvas" style="border: none;" width="1024px" height="768px"></canvas><br></center>
+
+		<script type="text/javascript" src="gltools.js"></script>
+		<script type="text/javascript" src="gl.js"></script>
+		<script id="shader2d-fs" type="x-shader/x-fragment">
+			precision highp float;
+			precision highp sampler2D;
+			uniform sampler2D colorTexture;
+			uniform sampler2D positionTexture;
+			uniform sampler2D normalTexture;
+			uniform mat4 projectionMatrix;
+			varying vec2 texmap;
+
+			float gamma = 2.2;
+			vec4 gammaCorrect(in vec4 v){
+				vec4 o=v;
+				o.r=pow(o.r,1.0/gamma);
+				o.g=pow(o.g,1.0/gamma);
+				o.b=pow(o.b,1.0/gamma);
+				return o;
+			}
+			vec4 textureCorrect(in vec4 v){
+				vec4 o=v;
+				o.r=pow(o.r,gamma);
+				o.g=pow(o.g,gamma);
+				o.b=pow(o.b,gamma);
+				return o;
+			}
+
+			float rand(vec2 co) {
+				return fract(sin(dot(normalize(co.xy), vec2(12.9898, 78.233))) * 43758.5453);
+			}
+			float rand(float c) {
+				return fract(sin(dot(normalize(vec2(c, c * c)), vec2(12.9898, 78.233))) *
+				             43758.5453);
+			}
+			const int samples = 16;
+			vec3 rand3(vec3 co, int i){
+				co/=10000.0;
+				float ci = float(i)/float(samples);
+				return vec3(
+					rand(vec2(
+						rand(co.xy),
+						rand(vec2(co.z,ci)))
+					),
+					rand(vec2(
+						rand(co.xz),
+						rand(vec2(co.y,ci)))
+					),
+					rand(vec2(
+						rand(vec2(co.x,ci)),
+						rand(co.yz))
+					));
+			}
+			void main(void) {
+				vec4 color = textureCorrect(texture2D(colorTexture, texmap));
+				vec3 position = texture2D(positionTexture, texmap).xyz;
+				vec3 normal = texture2D(normalTexture, texmap).xyz;
+
+				vec3 L = normalize(vec3(0.0,2.0,-3.0)-position);
+				vec3 E = normalize(position);
+
+				float shininess=64.0;
+				float specIntensity = pow(max(dot(normal,normalize(L - E)),0.0),shininess/4.0);
+				specIntensity = clamp(specIntensity, 0.0, 1.0);
+				specIntensity = 0.0;
+				float lightIntensity = dot(normal, L)*1.7;
+				lightIntensity = clamp(lightIntensity, 0.0, 1.0);
+				if(dot(normal, L)<=0.0){
+					specIntensity=0.0;
+					lightIntensity=0.0;
+				}
+				float ambientIntensity = 0.1;
+
+
+				vec4 ssdo = vec4(0.0);
+				float ssao = 0.0;
+				int count =0;
+				for(int i=0;i<samples;i++){
+					vec3 randv = rand3(position,i) * 2.0 - 1.0;
+					if(dot(normal,randv)<=0.0) continue;
+					randv = normalize(randv)*0.3 *float(i+1)/float(samples);
+					vec3 pos2 = randv + position;
+					vec4 pos2screen = projectionMatrix * vec4(pos2, 1.0);
+					pos2screen /= pos2screen.w;
+					if(pos2screen.x<-1.0 || pos2screen.y<-1.0 || pos2screen.x>1.0 || pos2screen.y >=1.0) continue;
+					float realDepth = length(texture2D(positionTexture, pos2screen.xy*0.5+0.5).xyz);
+					float invisibility = (realDepth <= length(pos2) ? 1.0 : 0.0) * smoothstep(0.0, 1.0, 1.0 / abs(length(pos2) - realDepth) * 0.3);
+					ssao += invisibility;
+					ssdo += invisibility * textureCorrect(texture2D(colorTexture, pos2screen.xy*0.5+0.5)) * dot(normalize(randv), normal) * dot(-normalize(randv),texture2D(normalTexture, pos2screen.xy*0.5+0.5).xyz);
+
+					count++;
+				}
+				ssdo = ssdo/max(float(count),1.0)*0.5;
+				ssao = 1.0-ssao/max(float(count),1.0);
+
+				gl_FragColor=gammaCorrect(ssao*(color*(lightIntensity+ambientIntensity)+vec4(1.0)*specIntensity + ssdo));
+				gl_FragColor.a=1.0;
+			}
+		</script>
+		<script id="shader2d-vs" type="x-shader/x-vertex">
+			attribute vec2 aVertexPosition;
+			attribute vec2 aVertexTexmap;
+			varying vec2 texmap;
+
+			void main(void) {
+				texmap=aVertexTexmap;
+				gl_Position = vec4(aVertexPosition, 0.0, 1.0);
+			}
+		</script>
+		<script id="shader3d-fs" type="x-shader/x-fragment">
+			#extension GL_EXT_draw_buffers : require
+			precision highp float;
+			precision highp sampler2D;
+			varying vec2 texmap;
+			varying vec3 position;
+			varying vec3 normal;
+
+			void main(void) {
+				gl_FragData[0]=vec4(texmap,0.0,1.0);
+				gl_FragData[1]=vec4(position,1.0);
+				gl_FragData[2]=vec4(normal,1.0);
+			}
+		</script>
+		<script id="shader3d-vs" type="x-shader/x-vertex">
+			attribute vec3 aVertexPosition;
+			attribute vec3 aVertexNormal;
+			attribute vec2 aVertexTexmap;
+			attribute vec3 aVertexTangent;
+			attribute vec3 aVertexBinormal;
+			varying vec2 texmap;
+			varying vec3 position;
+			varying vec3 normal;
+			uniform mat4 uMVMatrix;
+			uniform mat4 uNMVMatrix;
+			uniform mat4 uPMatrix;
+
+			mat3 transpose(in mat3 inMatrix) {
+				vec3 i0 = inMatrix[0];
+				vec3 i1 = inMatrix[1];
+				vec3 i2 = inMatrix[2];
+
+				mat3 outMatrix = mat3(
+							 vec3(i0.x, i1.x, i2.x),
+							 vec3(i0.y, i1.y, i2.y),
+							 vec3(i0.z, i1.z, i2.z)
+							 );
+
+				return outMatrix;
+			}
+			void main(void) {
+				texmap=aVertexNormal.yz;
+				vec3 norm=normalize((uNMVMatrix* vec4(aVertexNormal, 1.0)).xyz);
+				vec3 tangent=normalize((uNMVMatrix* vec4(aVertexTangent, 1.0)).xyz);
+				vec3 binorm=normalize((uNMVMatrix* vec4(aVertexBinormal, 1.0)).xyz);
+				mat3 TBN = transpose(mat3(
+					tangent,
+					binorm,
+					norm
+				));
+				vec4 position4 = uMVMatrix * vec4(aVertexPosition, 1.0);
+				position = position4.xyz;
+				normal = norm;
+				gl_Position = uPMatrix * position4;
+			}
+		</script>
+		<script type="text/javascript">
+			"use strict";
+			function initBuffers() {
+				var vertices = [
+					1.0, -1.0,  -1.0,
+					-1.0, -1.0,  -1.0,
+					-1.0,  1.0,  -1.0,
+
+					1.0, 1.0,  -1.0,
+					1.0, -1.0,  -1.0,
+					-1.0,  1.0,  -1.0,
+
+
+					-1.0, -1.0,  1.0,
+					1.0, -1.0,  1.0,
+					1.0,  1.0,  1.0,
+
+					-1.0, 1.0,  1.0,
+					-1.0, -1.0,  1.0,
+					1.0,  1.0,  1.0,
+
+
+					-1.0, 1.0,  -1.0,
+					-1.0, -1.0,  -1.0,
+					-1.0,  -1.0,  1.0,
+
+					-1.0, 1.0,  1.0,
+					-1.0, 1.0,  -1.0,
+					-1.0,  -1.0,  1.0,
+
+
+					1.0, -1.0,  -1.0,
+					1.0, 1.0,  -1.0,
+					1.0,  1.0,  1.0,
+
+					1.0, -1.0,  1.0,
+					1.0, -1.0,  -1.0,
+					1.0,  1.0,  1.0,
+
+
+					1.0,  1.0, -1.0,
+					-1.0,  1.0, -1.0,
+					-1.0, 1.0,  1.0,
+
+					1.0, 1.0,  1.0,
+					1.0, 1.0, -1.0,
+					-1.0, 1.0,  1.0,
+
+
+					-1.0, -1.0,  -1.0,
+					1.0, -1.0,  -1.0,
+					1.0, -1.0,  1.0,
+
+					-1.0, -1.0,  1.0,
+					-1.0, -1.0,  -1.0,
+					 1.0, -1.0,  1.0,
+
+
+					2.0,  0.0, -2.0,
+					-2.0,  0.0, -2.0,
+					-2.0, 0.0,  2.0,
+
+					2.0, 0.0,  2.0,
+					2.0, 0.0, -2.0,
+					-2.0, 0.0,  2.0,
+				];
+				renderer3d.addBuffer(vertices,3,shader3d.aVertexPosition);
+
+				var normals = [
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+
+
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+
+
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+
+
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+
+
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+
+
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+				];
+				renderer3d.addBuffer(normals,3,shader3d.aVertexNormal);
+
+				var texmap = [
+					2.0, 0.0,
+					0.0, 0.0,
+					0.0,  2.0,
+
+					2.0, 2.0,
+					2.0, 0.0,
+					0.0,  2.0,
+
+
+					0.0, 0.0,
+					2.0, 0.0,
+					2.0,  2.0,
+
+					0.0, 2.0,
+					0.0, 0.0,
+					2.0,  2.0,
+
+
+					2.0,  0.0,
+					0.0,  0.0,
+					0.0,  2.0,
+
+					2.0,  2.0,
+					2.0,  0.0,
+					0.0,  2.0,
+
+
+					0.0,  0.0,
+					2.0,  0.0,
+					2.0,  2.0,
+
+					0.0,  2.0,
+					0.0,  0.0,
+					2.0,  2.0,
+
+
+					2.0,  0.0,
+					0.0,  0.0,
+					0.0,   2.0,
+
+					2.0,   2.0,
+					2.0,  0.0,
+					0.0,  2.0,
+
+
+					0.0,   0.0,
+					2.0,   0.0,
+					2.0,  2.0,
+
+					0.0,   2.0,
+					0.0,   0.0,
+					 2.0,   2.0,
+
+					2.0,  0.0,
+					0.0,  0.0,
+					0.0,   2.0,
+
+					2.0,   2.0,
+					2.0,  0.0,
+					0.0,  2.0,
+				];
+				renderer3d.addBuffer(texmap,2,shader3d.aVertexTexmap);
+
+				var tangents = [];
+				var binormals = [];
+				for ( var i=0; i<vertices.length; i+=9){
+					var v00 = vertices[i+0];
+					var v01 = vertices[i+1];
+					var v02 = vertices[i+2];
+					var v10 = vertices[i+3];
+					var v11 = vertices[i+4];
+					var v12 = vertices[i+5];
+					var v20 = vertices[i+6];
+					var v21 = vertices[i+7];
+					var v22 = vertices[i+8];
+
+					// Shortcuts for UVs
+					var uv00 = texmap[i/3*2+0];
+					var uv01 = texmap[i/3*2+1];
+					var uv10 = texmap[i/3*2+2];
+					var uv11 = texmap[i/3*2+3];
+					var uv20 = texmap[i/3*2+4];
+					var uv21 = texmap[i/3*2+5];
+
+					// Edges of the triangle : postion delta
+					var deltaPos10 = v10-v00;
+					var deltaPos11 = v11-v01;
+					var deltaPos12 = v12-v02;
+					var deltaPos20 = v20-v00;
+					var deltaPos21 = v21-v01;
+					var deltaPos22 = v22-v02;
+
+					// UV delta
+					var deltaUV10 = uv10-uv00;
+					var deltaUV11 = uv11-uv01;
+					var deltaUV20 = uv20-uv00;
+					var deltaUV21 = uv21-uv01;
+					var r = 1.0 / (deltaUV10 * deltaUV21 - deltaUV11 * deltaUV20);
+					var tangent0 = (deltaPos10 * deltaUV21   - deltaPos20 * deltaUV11)*r;
+					var tangent1 = (deltaPos11 * deltaUV21   - deltaPos21 * deltaUV11)*r;
+					var tangent2 = (deltaPos12 * deltaUV21   - deltaPos22 * deltaUV11)*r;
+					tangents.push(tangent0);
+					tangents.push(tangent1);
+					tangents.push(tangent2);
+					tangents.push(tangent0);
+					tangents.push(tangent1);
+					tangents.push(tangent2);
+					tangents.push(tangent0);
+					tangents.push(tangent1);
+					tangents.push(tangent2);
+					var binormal0 = (deltaPos20 * deltaUV10   - deltaPos10 * deltaUV20)*r;
+					var binormal1 = (deltaPos21 * deltaUV10   - deltaPos11 * deltaUV20)*r;
+					var binormal2 = (deltaPos22 * deltaUV10   - deltaPos12 * deltaUV20)*r;
+					binormals.push(binormal0);
+					binormals.push(binormal1);
+					binormals.push(binormal2);
+					binormals.push(binormal0);
+					binormals.push(binormal1);
+					binormals.push(binormal2);
+					binormals.push(binormal0);
+					binormals.push(binormal1);
+					binormals.push(binormal2);
+				}
+				renderer3d.addBuffer(tangents,3,shader3d.aVertexTangent);
+				renderer3d.addBuffer(binormals,3,shader3d.aVertexBinormal);
+
+				vertices = [
+					-1.0, -1.0,
+					1.0, -1.0,
+					-1.0,  1.0,
+
+					1.0, -1.0,
+					1.0, 1.0,
+					-1.0,  1.0,
+				];
+				renderer2d.addBuffer(vertices, 2, shader2d.aVertexPosition);
+				texmap = [
+					0.0, 0.0,
+					1.0, 0.0,
+					0.0,  1.0,
+
+					1.0, 0.0,
+					1.0, 1.0,
+					0.0,  1.0,
+				];
+				renderer2d.addBuffer(texmap, 2, shader2d.aVertexTexmap);
+			}
+
+			var gl;
+			var renderer3d;
+			var shader3d;
+			var fbo3d;
+			var texColor3d;
+			var texPos3d;
+			var texNorm3d;
+			var bufDepth3d;
+			var renderer2d;
+			var shader2d;
+			function tick(){
+				requestAnimFrame(tick);
+				fbo3d.bind();
+				shader3d.bind();
+				renderer3d.draw();
+				fbo3d.unbind();
+				shader2d.bind();
+				renderer2d.draw();
+			}
+
+			var angleX=0.0;
+			var angleY=0.0;
+			function webGLStart() {
+				var canvas = document.getElementById("canvas");
+				canvas.onmousedown = handleMouseDown;
+				document.onmouseup = handleMouseUp;
+				document.onmousemove = handleMouseMove;
+				canvas.ontouchstart = function(e){
+					if(e.preventDefault)
+						e.preventDefault();
+					handleMouseDown(e.changedTouches[0]);
+				};
+				canvas.ontouchend = function(e){
+					if(e.preventDefault)
+						e.preventDefault();
+					handleMouseUp(e.changedTouches[0]);
+				};
+				canvas.ontouchmove = function(e){
+					if(e.preventDefault)
+						e.preventDefault();
+					handleMouseMove(e.changedTouches[0]);
+				};
+				gl = initGL(canvas);
+				gl.clearColor(0.0, 0.0, 0.0, 1.0);
+				gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+				gl.enable(gl.CULL_FACE);
+				gl.enable(gl.DEPTH_TEST);
+				shader3d = new ShaderProgram("shader3d",gl, function(shaderProgram){
+					var pMatrix = mat4.create();
+					mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+					gl.uniformMatrix4fv(shaderProgram.uPMatrix, false, pMatrix);
+					var mvMatrix = mat4.create();
+					mat4.identity(mvMatrix);
+					mat4.translate(mvMatrix, [0.0,  0.0,-3.0]);
+					mat4.rotateX(mvMatrix, -1.57079632679+angleY);
+					mat4.rotateZ(mvMatrix, angleX+3.14);
+					gl.uniformMatrix4fv(shaderProgram.uMVMatrix, false, mvMatrix);
+					var nmvMatrix=mvMatrix;
+					mat4.inverse(nmvMatrix);
+					mat4.transpose(nmvMatrix);
+					gl.uniformMatrix4fv(shaderProgram.uNMVMatrix, false, nmvMatrix);
+				});
+				shader3d.addAttribute("aVertexPosition");
+				shader3d.addAttribute("aVertexNormal");
+				shader3d.addAttribute("aVertexTexmap");
+				shader3d.addAttribute("aVertexTangent");
+				shader3d.addAttribute("aVertexBinormal");
+				shader3d.addUniform("uPMatrix");
+				shader3d.addUniform("uMVMatrix");
+				shader3d.addUniform("uNMVMatrix");
+
+				renderer3d = new Renderer(gl);
+
+				texColor3d = new Texture(null, gl, TextureFlags.FLOAT, 1024, 1024);
+				texPos3d = new Texture(null, gl, TextureFlags.FLOAT, 1024, 1024);
+				texNorm3d = new Texture(null, gl, TextureFlags.FLOAT, 1024, 1024);
+				bufDepth3d = new RenderBuffer(gl, 1024, 1024, true);
+				fbo3d = new FrameBuffer(gl);
+				fbo3d.addTarget(texColor3d);
+				fbo3d.addTarget(texPos3d);
+				fbo3d.addTarget(texNorm3d);
+				fbo3d.addRenderbuffer(bufDepth3d);
+
+				shader2d = new ShaderProgram("shader2d",gl,function(shaderProgram){
+					var pMatrix = mat4.create();
+					mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+					gl.uniformMatrix4fv(shaderProgram.projectionMatrix, false, pMatrix);
+				});
+				shader2d.addAttribute("aVertexPosition");
+				shader2d.addAttribute("aVertexTexmap");
+				shader2d.addUniform("projectionMatrix");
+				shader2d.addTextureUniform("colorTexture");
+				shader2d.addTextureUniform("positionTexture");
+				shader2d.addTextureUniform("normalTexture");
+
+				renderer2d = new Renderer(gl);
+				renderer2d.addTexture(texColor3d);
+				renderer2d.addTexture(texPos3d);
+				renderer2d.addTexture(texNorm3d);
+
+				initBuffers();
+
+				tick();
+			}
+			var mouseDown = false;
+			var lastMouseX = null;
+			var lastMouseY = null;
+			function handleMouseDown(event) {
+				if(event.preventDefault)
+					event.preventDefault();
+				mouseDown = true;
+				lastMouseX = event.clientX;
+				lastMouseY = event.clientY;
+				return false;
+			}
+
+			function handleMouseUp(event) {
+				mouseDown = false;
+			}
+
+			function handleMouseMove(event) {
+				if (!mouseDown) {
+					return;
+				}
+				var newX = event.clientX;
+				var newY = event.clientY;
+
+				var deltaX = newX - lastMouseX;
+				var deltaY = newY - lastMouseY;
+
+				angleX+=deltaX / 573.0;
+				angleY+=deltaY / 573.0;
+
+				lastMouseX = newX
+				lastMouseY = newY;
+			}
+		</script>
+
+	</body>
+</html>
