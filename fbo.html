@@ -152,7 +152,7 @@
 				return outMatrix;
 			}
 			void main(void) {
-				texmap=aVertexNormal.yz;
+				texmap=aVertexNormal.yz/2.0+0.5;
 				vec3 norm=normalize((uNMVMatrix* vec4(aVertexNormal, 1.0)).xyz);
 				vec3 tangent=normalize((uNMVMatrix* vec4(aVertexTangent, 1.0)).xyz);
 				vec3 binorm=normalize((uNMVMatrix* vec4(aVertexBinormal, 1.0)).xyz);
@@ -521,7 +521,7 @@
 
 				renderer3d = new Renderer(gl);
 
-				texColor3d = new Texture(null, gl, TextureFlags.FLOAT, 1024, 1024);
+				texColor3d = new Texture(null, gl, 0, 1024, 1024);
 				texPos3d = new Texture(null, gl, TextureFlags.FLOAT, 1024, 1024);
 				texNorm3d = new Texture(null, gl, TextureFlags.FLOAT, 1024, 1024);
 				bufDepth3d = new RenderBuffer(gl, 1024, 1024, true);
