@@ -177,7 +177,7 @@ function ShaderProgram(name, gl, setUniforms = function(shaderProgram) {}) {
 	gl.attachShader(this.id, fragmentShader);
 	gl.linkProgram(this.id);
 	if (!gl.getProgramParameter(this.id, gl.LINK_STATUS)) {
-		alert("Could not initialise shaders");
+		alert("Could not initialise shader "+name);
 	}
 };
 ShaderProgram.prototype.bind = function() {
@@ -246,8 +246,13 @@ FrameBuffer.prototype.bind = function() {
 		                 this.colorTargets[0].height);
 	this.gl.drawBuffersExt.drawBuffersWEBGL(
 	    getColorAttachmentList(this.gl, this.colorTargets.length));
+	if (this.depthTarget)
+		this.gl.enable(this.gl.DEPTH_TEST);
+	else
+		this.gl.disable(this.gl.DEPTH_TEST);
 };
 FrameBuffer.prototype.unbind = function() {
+	this.gl.disable(this.gl.DEPTH_TEST);
 	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
 	this.gl.viewport(0, 0, this.gl.viewportWidth, this.gl.viewportHeight);
 };
@@ -280,4 +285,73 @@ FrameBuffer.prototype.addRenderbuffer = function(buffer) {
 		this.depthTarget = buffer;
 	}
 	this.unbind();
+};
+
+function Filter(textures, shaderName, gl,
+                setUnifroms = function(shaderProgram) {}) {
+	this.gl = gl;
+	this.textures = textures;
+	this.shader = new ShaderProgram(shaderName, gl, setUnifroms);
+	this.shader.addAttribute("aVertexPosition");
+	this.shader.addAttribute("aVertexTexmap");
+	for (var i in textures)
+		this.shader.addTextureUniform(i);
+	this.renderer = new Renderer(gl);
+	for (var i in textures)
+		this.renderer.addTexture(textures[i]);
+	var vertices = [
+		-1.0,
+		-1.0,
+		1.0,
+
+		-1.0,
+		-1.0,
+		1.0,
+
+		1.0,
+		-1.0,
+		1.0,
+
+		1.0,
+		-1.0,
+		1.0,
+	];
+	this.renderer.addBuffer(vertices, 2, this.shader.aVertexPosition);
+	var texmap = [
+		0.0,
+		0.0,
+		1.0,
+
+		0.0,
+		0.0,
+		1.0,
+
+		1.0,
+		0.0,
+		1.0,
+
+		1.0,
+		0.0,
+		1.0,
+	];
+	this.renderer.addBuffer(texmap, 2, this.shader.aVertexTexmap);
+};
+Filter.prototype.draw = function() {
+	this.shader.bind();
+	this.renderer.draw();
+};
+
+function TextureFilter(width, height, textures, shaderName, gl,
+                setUnifroms = function(shaderProgram) {}){
+	Filter.apply(this, [textures, shaderName, gl, setUnifroms]);
+	this.fbo = new FrameBuffer(gl);
+	this.output = new Texture(null, gl, 0, width, height);
+	this.fbo.addTarget(this.output);
+};
+TextureFilter.prototype = Object.create(Filter.prototype);
+TextureFilter.prototype.constructor = TextureFilter;
+TextureFilter.prototype.draw = function() {
+	this.fbo.bind();
+	Filter.prototype.draw.apply(this,[]);
+	this.fbo.unbind();
 };

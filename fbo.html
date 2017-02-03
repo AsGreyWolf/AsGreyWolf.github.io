@@ -1,11 +1,167 @@
 <!DOCTYPE html>
 <html>
 	<body onload="webGLStart();" style="width:100%; height:100%;">
-		<center><canvas id="canvas" style="border: none;" width="1024px" height="768px"></canvas><br></center>
+		<center><canvas id="canvas" style="border: none;" width="1024px" height="768px"></canvas><br>
+		<input type="radio" name="mode" value="0" checked> No AO<br>
+		<input type="radio" name="mode" value="1" > SSAO<br>
+		<input type="radio" name="mode" value="2" > SSDO<br>
+		<input type="radio" name="mode" value="3" > SSDO+SSAO<br>
+		<input type="radio" name="mode" value="4" > SSDO map<br></center>
 
 		<script type="text/javascript" src="gltools.js"></script>
 		<script type="text/javascript" src="gl.js"></script>
+		<script id="blurY-fs" type="x-shader/x-fragment">
+			precision highp float;
+			precision highp sampler2D;
+			uniform sampler2D texture;
+			varying vec2 texmap;
+
+			vec4 blur(vec2 pos, vec2 v) {
+				const float radius = 20.0;
+				vec3 texel_radius = vec3(v.xy, radius);
+				float INV_SQRT_2PI_X3 = 1.1968268412042980338198381798031;
+				float exp_value = -4.5 / radius / radius;
+				float sqrt_value = INV_SQRT_2PI_X3 / radius;
+				float sum = 0.0;
+				vec4 value = vec4(0.0,0.0,0.0,0.0);
+				for(float x = 1.0; x<=radius; x+=1.0){
+					float currentScale = exp(exp_value * x * x);
+					sum += currentScale;
+					vec2 dudv = texel_radius.xy * x;
+					value +=
+					    currentScale * (texture2D(texture, pos - dudv) + texture2D(texture, pos + dudv));
+				}
+				float correction = 1.0 / sqrt_value - 2.0 * sum;
+				value += texture2D(texture, pos) * correction;
+				return value * sqrt_value;
+			}
+
+			void main(void) {
+				gl_FragColor = blur(texmap,vec2(0.0,0.001));
+			}
+		</script>
+		<script id="blurY-vs" type="x-shader/x-vertex">
+			attribute vec2 aVertexPosition;
+			attribute vec2 aVertexTexmap;
+			varying vec2 texmap;
+
+			void main(void) {
+				texmap=aVertexTexmap;
+				gl_Position = vec4(aVertexPosition, 0.0, 1.0);
+			}
+		</script>
+		<script id="blurX-fs" type="x-shader/x-fragment">
+			precision highp float;
+			precision highp sampler2D;
+			uniform sampler2D texture;
+			varying vec2 texmap;
+
+			vec4 blur(vec2 pos, vec2 v) {
+				const float radius = 20.0;
+				vec3 texel_radius = vec3(v.xy, radius);
+				float INV_SQRT_2PI_X3 = 1.1968268412042980338198381798031;
+				float exp_value = -4.5 / radius / radius;
+				float sqrt_value = INV_SQRT_2PI_X3 / radius;
+				float sum = 0.0;
+				vec4 value = vec4(0.0,0.0,0.0,0.0);
+				for(float x = 1.0; x<=radius; x+=1.0){
+					float currentScale = exp(exp_value * x * x);
+					sum += currentScale;
+					vec2 dudv = texel_radius.xy * x;
+					value +=
+					    currentScale * (texture2D(texture, pos - dudv) + texture2D(texture, pos + dudv));
+				}
+				float correction = 1.0 / sqrt_value - 2.0 * sum;
+				value += texture2D(texture, pos) * correction;
+				return value * sqrt_value;
+			}
+
+			void main(void) {
+				gl_FragColor = blur(texmap,vec2(0.001,0.0));
+			}
+		</script>
+		<script id="blurX-vs" type="x-shader/x-vertex">
+			attribute vec2 aVertexPosition;
+			attribute vec2 aVertexTexmap;
+			varying vec2 texmap;
+
+			void main(void) {
+				texmap=aVertexTexmap;
+				gl_Position = vec4(aVertexPosition, 0.0, 1.0);
+			}
+		</script>
 		<script id="shader2d-fs" type="x-shader/x-fragment">
+			precision highp float;
+			precision highp sampler2D;
+			uniform sampler2D colorTexture;
+			uniform sampler2D positionTexture;
+			uniform sampler2D normalTexture;
+			uniform sampler2D ssdoTexture;
+			uniform int mode;
+			varying vec2 texmap;
+
+			float gamma = 2.2;
+			vec4 gammaCorrect(in vec4 v){
+				vec4 o=v;
+				o.r=pow(o.r,1.0/gamma);
+				o.g=pow(o.g,1.0/gamma);
+				o.b=pow(o.b,1.0/gamma);
+				return o;
+			}
+			vec4 textureCorrect(in vec4 v){
+				vec4 o=v;
+				o.r=pow(o.r,gamma);
+				o.g=pow(o.g,gamma);
+				o.b=pow(o.b,gamma);
+				return o;
+			}
+
+			void main(void) {
+				vec4 color = textureCorrect(texture2D(colorTexture, texmap));
+				vec3 position = texture2D(positionTexture, texmap).xyz;
+				vec3 normal = texture2D(normalTexture, texmap).xyz;
+				vec4 ssdo = textureCorrect(texture2D(ssdoTexture, texmap));
+
+				vec3 L = normalize(vec3(0.0,4.0,-3.0)-position);
+				vec3 E = normalize(position);
+
+				float shininess=64.0;
+				float specIntensity = 0.0;//pow(max(dot(normal,normalize(L - E)),0.0),shininess/4.0);
+				specIntensity = clamp(specIntensity, 0.0, 1.0);
+				float lightIntensity = dot(normal, L)*1.7;
+				lightIntensity = clamp(lightIntensity, 0.0, 1.0);
+				if(dot(normal, L)<=0.0){
+					specIntensity=0.0;
+					lightIntensity=0.0;
+				}
+				float ambientIntensity = 0.1;
+
+				if(mode==2 || mode==3)
+					color = mix(color,ssdo,1.0-ssdo.a); //add SSDO
+				color *= (lightIntensity+ambientIntensity); //diffuse and ambient
+				color += vec4(1.0)*specIntensity; //spectacular
+				if(mode==1 || mode==3)
+					color *= ssdo.a; //add SSAO
+
+				if(mode==4)
+					color = ssdo; //debug mode
+
+				gl_FragColor = gammaCorrect(color);
+				// gl_FragColor = ssdo.a*(vec4(ssdo.rgb,1.0)+vec4(0.5));
+				gl_FragColor.a=1.0;
+			}
+		</script>
+		<script id="shader2d-vs" type="x-shader/x-vertex">
+			attribute vec2 aVertexPosition;
+			attribute vec2 aVertexTexmap;
+			varying vec2 texmap;
+
+			void main(void) {
+				texmap=aVertexTexmap;
+				gl_Position = vec4(aVertexPosition, 0.0, 1.0);
+			}
+		</script>
+		<script id="ssdo-fs" type="x-shader/x-fragment">
 			precision highp float;
 			precision highp sampler2D;
 			uniform sampler2D colorTexture;
@@ -60,48 +216,41 @@
 				vec3 position = texture2D(positionTexture, texmap).xyz;
 				vec3 normal = texture2D(normalTexture, texmap).xyz;
 
-				vec3 L = normalize(vec3(0.0,2.0,-3.0)-position);
-				vec3 E = normalize(position);
-
-				float shininess=64.0;
-				float specIntensity = pow(max(dot(normal,normalize(L - E)),0.0),shininess/4.0);
-				specIntensity = clamp(specIntensity, 0.0, 1.0);
-				specIntensity = 0.0;
-				float lightIntensity = dot(normal, L)*1.7;
-				lightIntensity = clamp(lightIntensity, 0.0, 1.0);
-				if(dot(normal, L)<=0.0){
-					specIntensity=0.0;
-					lightIntensity=0.0;
-				}
-				float ambientIntensity = 0.1;
-
-
 				vec4 ssdo = vec4(0.0);
+				vec4 ssdo_amb = vec4(0.0);
 				float ssao = 0.0;
-				int count =0;
+				int count = 0;
+				const float radius = 0.5;
 				for(int i=0;i<samples;i++){
-					vec3 randv = rand3(position,i) * 2.0 - 1.0;
-					if(dot(normal,randv)<=0.0) continue;
-					randv = normalize(randv)*0.3 *float(i+1)/float(samples);
-					vec3 pos2 = randv + position;
-					vec4 pos2screen = projectionMatrix * vec4(pos2, 1.0);
-					pos2screen /= pos2screen.w;
-					if(pos2screen.x<-1.0 || pos2screen.y<-1.0 || pos2screen.x>1.0 || pos2screen.y >=1.0) continue;
-					float realDepth = length(texture2D(positionTexture, pos2screen.xy*0.5+0.5).xyz);
-					float invisibility = (realDepth <= length(pos2) ? 1.0 : 0.0) * smoothstep(0.0, 1.0, 1.0 / abs(length(pos2) - realDepth) * 0.3);
+					vec3 occDir = normalize(rand3(position,i) * 2.0 - 1.0);
+					if(dot(normal,occDir)<=0.0) continue;
+					vec3 occDiff = occDir * radius * float(i+1) / float(samples);
+					vec3 occ = occDiff + position;
+					vec4 occ2screen = projectionMatrix * vec4(occ, 1.0);
+					occ2screen /= occ2screen.w;
+					if(occ2screen.x<-1.0 || occ2screen.y<-1.0 || occ2screen.x>1.0 || occ2screen.y >=1.0) continue;
+
+					vec2 occTexCoord = occ2screen.xy*0.5+0.5;
+					float occDepth = texture2D(positionTexture, occTexCoord).z;
+					float distance =  abs(occDepth - occ.z) / radius;
+					float invisibility = ((occDepth <= occ.z) ? 0.0 : 1.0) * smoothstep(1.0, 0.0, distance);
+
+					vec4 occColor = textureCorrect(texture2D(colorTexture, occTexCoord));
+					float geometryFactor = dot(occDir, normal);// * dot(-occDir,texture2D(normalTexture, occTexCoord).xyz);
+					ssdo += invisibility * occColor * geometryFactor;
+					ssdo_amb += occColor * geometryFactor;
 					ssao += invisibility;
-					ssdo += invisibility * textureCorrect(texture2D(colorTexture, pos2screen.xy*0.5+0.5)) * dot(normalize(randv), normal) * dot(-normalize(randv),texture2D(normalTexture, pos2screen.xy*0.5+0.5).xyz);
 
 					count++;
 				}
-				ssdo = ssdo/max(float(count),1.0)*0.5;
+				ssdo = max(vec4(0.0),ssdo/max(float(count),1.0));
+				ssdo_amb = max(vec4(0.0),ssdo_amb/max(float(count),1.0));
 				ssao = 1.0-ssao/max(float(count),1.0);
-
-				gl_FragColor=gammaCorrect(ssao*(color*(lightIntensity+ambientIntensity)+vec4(1.0)*specIntensity + ssdo));
-				gl_FragColor.a=1.0;
+				gl_FragColor=gammaCorrect(ssdo);
+				gl_FragColor.a=ssao;
 			}
 		</script>
-		<script id="shader2d-vs" type="x-shader/x-vertex">
+		<script id="ssdo-vs" type="x-shader/x-vertex">
 			attribute vec2 aVertexPosition;
 			attribute vec2 aVertexTexmap;
 			varying vec2 texmap;
@@ -120,7 +269,7 @@
 			varying vec3 normal;
 
 			void main(void) {
-				gl_FragData[0]=vec4(texmap,0.0,1.0);
+				gl_FragData[0]=vec4(vec2(mix(0.5,1.0,normal.y/2.0+0.5)),1.0,1.0);
 				gl_FragData[1]=vec4(position,1.0);
 				gl_FragData[2]=vec4(normal,1.0);
 			}
@@ -232,7 +381,64 @@
 					2.0, 0.0,  2.0,
 					2.0, 0.0, -2.0,
 					-2.0, 0.0,  2.0,
+
+					0.1, -0.1,  -0.1,
+					-0.1, -0.1,  -0.1,
+					-0.1,  0.1,  -0.1,
+
+					0.1, 0.1,  -0.1,
+					0.1, -0.1,  -0.1,
+					-0.1,  0.1,  -0.1,
+
+
+					-0.1, -0.1,  0.1,
+					0.1, -0.1,  0.1,
+					0.1,  0.1,  0.1,
+
+					-0.1, 0.1,  0.1,
+					-0.1, -0.1,  0.1,
+					0.1,  0.1,  0.1,
+
+
+					-0.1, 0.1,  -0.1,
+					-0.1, -0.1,  -0.1,
+					-0.1,  -0.1,  0.1,
+
+					-0.1, 0.1,  0.1,
+					-0.1, 0.1,  -0.1,
+					-0.1,  -0.1,  0.1,
+
+
+					0.1, -0.1,  -0.1,
+					0.1, 0.1,  -0.1,
+					0.1,  0.1,  0.1,
+
+					0.1, -0.1,  0.1,
+					0.1, -0.1,  -0.1,
+					0.1,  0.1,  0.1,
+
+
+					0.1,  0.1, -0.1,
+					-0.1,  0.1, -0.1,
+					-0.1, 0.1,  0.1,
+
+					0.1, 0.1,  0.1,
+					0.1, 0.1, -0.1,
+					-0.1, 0.1,  0.1,
+
+
+					-0.1, -0.1,  -0.1,
+					0.1, -0.1,  -0.1,
+					0.1, -0.1,  0.1,
+
+					-0.1, -0.1,  0.1,
+					-0.1, -0.1,  -0.1,
+					 0.1, -0.1,  0.1,
 				];
+				for(var i=14*9; i<vertices.length; i+=3){
+					vertices[i+1]+=0.5;
+						vertices[i+2]+=1.2;
+				}
 				renderer3d.addBuffer(vertices,3,shader3d.aVertexPosition);
 
 				var normals = [
@@ -296,6 +502,59 @@
 					0.0, 1.0, 0.0,
 					0.0, 1.0, 0.0,
 					0.0, 1.0, 0.0,
+
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+					0.0, 0.0, -1.0,
+
+
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+					0.0, 0.0,  1.0,
+
+
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+					-1.0, 0.0,  0.0,
+
+
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+					1.0, 0.0,  0.0,
+
+
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+					0.0, 1.0, 0.0,
+
+
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
+					0.0, -1.0, 0.0,
 				];
 				renderer3d.addBuffer(normals,3,shader3d.aVertexNormal);
 
@@ -360,6 +619,59 @@
 					2.0,   2.0,
 					2.0,  0.0,
 					0.0,  2.0,
+
+					2.0, 0.0,
+					0.0, 0.0,
+					0.0,  2.0,
+
+					2.0, 2.0,
+					2.0, 0.0,
+					0.0,  2.0,
+
+
+					0.0, 0.0,
+					2.0, 0.0,
+					2.0,  2.0,
+
+					0.0, 2.0,
+					0.0, 0.0,
+					2.0,  2.0,
+
+
+					2.0,  0.0,
+					0.0,  0.0,
+					0.0,  2.0,
+
+					2.0,  2.0,
+					2.0,  0.0,
+					0.0,  2.0,
+
+
+					0.0,  0.0,
+					2.0,  0.0,
+					2.0,  2.0,
+
+					0.0,  2.0,
+					0.0,  0.0,
+					2.0,  2.0,
+
+
+					2.0,  0.0,
+					0.0,  0.0,
+					0.0,   2.0,
+
+					2.0,   2.0,
+					2.0,  0.0,
+					0.0,  2.0,
+
+
+					0.0,   0.0,
+					2.0,   0.0,
+					2.0,  2.0,
+
+					0.0,   2.0,
+					0.0,   0.0,
+					 2.0,   2.0,
 				];
 				renderer3d.addBuffer(texmap,2,shader3d.aVertexTexmap);
 
@@ -425,27 +737,6 @@
 				}
 				renderer3d.addBuffer(tangents,3,shader3d.aVertexTangent);
 				renderer3d.addBuffer(binormals,3,shader3d.aVertexBinormal);
-
-				vertices = [
-					-1.0, -1.0,
-					1.0, -1.0,
-					-1.0,  1.0,
-
-					1.0, -1.0,
-					1.0, 1.0,
-					-1.0,  1.0,
-				];
-				renderer2d.addBuffer(vertices, 2, shader2d.aVertexPosition);
-				texmap = [
-					0.0, 0.0,
-					1.0, 0.0,
-					0.0,  1.0,
-
-					1.0, 0.0,
-					1.0, 1.0,
-					0.0,  1.0,
-				];
-				renderer2d.addBuffer(texmap, 2, shader2d.aVertexTexmap);
 			}
 
 			var gl;
@@ -456,21 +747,27 @@
 			var texPos3d;
 			var texNorm3d;
 			var bufDepth3d;
-			var renderer2d;
-			var shader2d;
+			var ssdoFilter;
+			var blurXFilter;
+			var blurYFilter;
+			var screenFilter;
 			function tick(){
 				requestAnimFrame(tick);
 				fbo3d.bind();
 				shader3d.bind();
 				renderer3d.draw();
 				fbo3d.unbind();
-				shader2d.bind();
-				renderer2d.draw();
+				ssdoFilter.draw();
+				blurXFilter.draw();
+				blurYFilter.draw();
+				screenFilter.draw();
 			}
 
 			var angleX=0.0;
 			var angleY=0.0;
+			var radios;
 			function webGLStart() {
+				radios=document.getElementsByName('mode');
 				var canvas = document.getElementById("canvas");
 				canvas.onmousedown = handleMouseDown;
 				document.onmouseup = handleMouseUp;
@@ -494,7 +791,6 @@
 				gl.clearColor(0.0, 0.0, 0.0, 1.0);
 				gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 				gl.enable(gl.CULL_FACE);
-				gl.enable(gl.DEPTH_TEST);
 				shader3d = new ShaderProgram("shader3d",gl, function(shaderProgram){
 					var pMatrix = mat4.create();
 					mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
@@ -531,22 +827,25 @@
 				fbo3d.addTarget(texNorm3d);
 				fbo3d.addRenderbuffer(bufDepth3d);
 
-				shader2d = new ShaderProgram("shader2d",gl,function(shaderProgram){
+				ssdoFilter = new TextureFilter(1024,1024,{colorTexture:texColor3d,positionTexture:texPos3d,normalTexture:texNorm3d},"ssdo",gl,function(shaderProgram){
 					var pMatrix = mat4.create();
 					mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
 					gl.uniformMatrix4fv(shaderProgram.projectionMatrix, false, pMatrix);
 				});
-				shader2d.addAttribute("aVertexPosition");
-				shader2d.addAttribute("aVertexTexmap");
-				shader2d.addUniform("projectionMatrix");
-				shader2d.addTextureUniform("colorTexture");
-				shader2d.addTextureUniform("positionTexture");
-				shader2d.addTextureUniform("normalTexture");
+				ssdoFilter.shader.addUniform("projectionMatrix");
 
-				renderer2d = new Renderer(gl);
-				renderer2d.addTexture(texColor3d);
-				renderer2d.addTexture(texPos3d);
-				renderer2d.addTexture(texNorm3d);
+				blurXFilter = new TextureFilter(1024,1024,{texture:ssdoFilter.output},"blurX",gl);
+				blurYFilter = new TextureFilter(1024,1024,{texture:blurXFilter.output},"blurY",gl);
+				screenFilter = new Filter({colorTexture:texColor3d,ssdoTexture:texPos3d,normalTexture:texNorm3d,ssdoTexture:blurYFilter.output},"shader2d",gl,
+				function(shaderProgram){
+					for (var i = 0, length = radios.length; i < length; i++) {
+						if (radios[i].checked) {
+							gl.uniform1i(shaderProgram.mode, radios[i].value);
+							break;
+						}
+					}
+				});
+				screenFilter.shader.addUniform("mode");
 
 				initBuffers();
 
