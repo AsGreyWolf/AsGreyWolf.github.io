@@ -110,6 +110,7 @@
 				return vec4(pow(v.rgb,vec3(gamma)), v.a);
 			}
 
+			const vec4 sunColor = vec4(256.0/255.0,212.0/255.0,64.0/255.0,1.0);
 			void main(void) {
 				vec4 color = textureCorrect(texture2D(colorTexture, texmap));
 				vec3 position = texture2D(positionTexture, texmap).xyz;
@@ -132,7 +133,7 @@
 
 				if(mode==2 || mode==3)
 					color *= ssdo; //add SSDO
-				color *= (lightIntensity+ambientIntensity); //diffuse and ambient
+				color *= (lightIntensity*sunColor+ambientIntensity*vec4(1.0)); //diffuse and ambient
 				color += vec4(1.0)*specIntensity; //spectacular
 				if(mode==1 || mode==3)
 					color *= ssdo.a; //add SSAO
