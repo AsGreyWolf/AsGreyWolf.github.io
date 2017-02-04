@@ -6,8 +6,10 @@
 		<input type="radio" name="mode" value="1" > SSAO<br>
 		<input type="radio" name="mode" value="2" > SSDO<br>
 		<input type="radio" name="mode" value="3" > SSDO+SSAO<br>
-		<input type="radio" name="mode" value="4" > SSDO map<br></center>
-
+		<input type="radio" name="mode" value="4" > SSDO map<br>
+		<input type="radio" name="mode" value="5" > SSAO map<br>
+		Sky: <input class="jscolor" id="skyColor" value="7EC0EE"><br></center>
+		<script src="jscolor.min.js"></script>
 		<script type="text/javascript" src="gltools.js"></script>
 		<script type="text/javascript" src="gl.js"></script>
 		<script id="blurY-fs" type="x-shader/x-fragment">
@@ -102,18 +104,10 @@
 
 			float gamma = 2.2;
 			vec4 gammaCorrect(in vec4 v){
-				vec4 o=v;
-				o.r=pow(o.r,1.0/gamma);
-				o.g=pow(o.g,1.0/gamma);
-				o.b=pow(o.b,1.0/gamma);
-				return o;
+				return vec4(pow(v.rgb,vec3(1.0/gamma)), v.a);
 			}
 			vec4 textureCorrect(in vec4 v){
-				vec4 o=v;
-				o.r=pow(o.r,gamma);
-				o.g=pow(o.g,gamma);
-				o.b=pow(o.b,gamma);
-				return o;
+				return vec4(pow(v.rgb,vec3(gamma)), v.a);
 			}
 
 			void main(void) {
@@ -134,20 +128,21 @@
 					specIntensity=0.0;
 					lightIntensity=0.0;
 				}
-				float ambientIntensity = 0.1;
+				float ambientIntensity = 0.6;
 
 				if(mode==2 || mode==3)
-					color = mix(color,ssdo,1.0-ssdo.a); //add SSDO
+					color *= ssdo; //add SSDO
 				color *= (lightIntensity+ambientIntensity); //diffuse and ambient
 				color += vec4(1.0)*specIntensity; //spectacular
 				if(mode==1 || mode==3)
 					color *= ssdo.a; //add SSAO
 
 				if(mode==4)
-					color = ssdo; //debug mode
+					color = ssdo; //SSDO map mode
+				if(mode==5)
+					color = vec4(ssdo.a); //SSAO map mode
 
 				gl_FragColor = gammaCorrect(color);
-				// gl_FragColor = ssdo.a*(vec4(ssdo.rgb,1.0)+vec4(0.5));
 				gl_FragColor.a=1.0;
 			}
 		</script>
@@ -168,30 +163,19 @@
 			uniform sampler2D positionTexture;
 			uniform sampler2D normalTexture;
 			uniform mat4 projectionMatrix;
+			uniform vec3 skyColor;
 			varying vec2 texmap;
 
 			float gamma = 2.2;
 			vec4 gammaCorrect(in vec4 v){
-				vec4 o=v;
-				o.r=pow(o.r,1.0/gamma);
-				o.g=pow(o.g,1.0/gamma);
-				o.b=pow(o.b,1.0/gamma);
-				return o;
+				return vec4(pow(v.rgb,vec3(1.0/gamma)), v.a);
 			}
 			vec4 textureCorrect(in vec4 v){
-				vec4 o=v;
-				o.r=pow(o.r,gamma);
-				o.g=pow(o.g,gamma);
-				o.b=pow(o.b,gamma);
-				return o;
+				return vec4(pow(v.rgb,vec3(gamma)), v.a);
 			}
 
-			float rand(vec2 co) {
+			float rand(in vec2 co) {
 				return fract(sin(dot(normalize(co.xy), vec2(12.9898, 78.233))) * 43758.5453);
-			}
-			float rand(float c) {
-				return fract(sin(dot(normalize(vec2(c, c * c)), vec2(12.9898, 78.233))) *
-				             43758.5453);
 			}
 			const int samples = 16;
 			vec3 rand3(vec3 co, int i){
@@ -220,7 +204,9 @@
 				vec4 ssdo_amb = vec4(0.0);
 				float ssao = 0.0;
 				int count = 0;
-				const float radius = 0.5;
+				const float radius = 1.0;
+				const float max_distance = 2.0;
+				vec4 sky = vec4(skyColor,1.0);
 				for(int i=0;i<samples;i++){
 					vec3 occDir = normalize(rand3(position,i) * 2.0 - 1.0);
 					if(dot(normal,occDir)<=0.0) continue;
@@ -228,16 +214,19 @@
 					vec3 occ = occDiff + position;
 					vec4 occ2screen = projectionMatrix * vec4(occ, 1.0);
 					occ2screen /= occ2screen.w;
-					if(occ2screen.x<-1.0 || occ2screen.y<-1.0 || occ2screen.x>1.0 || occ2screen.y >=1.0) continue;
-
-					vec2 occTexCoord = occ2screen.xy*0.5+0.5;
-					float occDepth = texture2D(positionTexture, occTexCoord).z;
-					float distance =  abs(occDepth - occ.z) / radius;
-					float invisibility = ((occDepth <= occ.z) ? 0.0 : 1.0) * smoothstep(1.0, 0.0, distance);
-
+					vec2 occTexCoord = clamp(occ2screen.xy*0.5+0.5,0.0,1.0);
+					vec3 occPos = texture2D(positionTexture, occTexCoord).xyz;
+					float occDepth = occPos.z;
+					vec3 occNormal = texture2D(normalTexture, occTexCoord).xyz;
 					vec4 occColor = textureCorrect(texture2D(colorTexture, occTexCoord));
-					float geometryFactor = dot(occDir, normal);// * dot(-occDir,texture2D(normalTexture, occTexCoord).xyz);
-					ssdo += invisibility * occColor * geometryFactor;
+
+					float distance =  abs(occDepth - position.z) / max_distance;
+					float invisibility = ((occDepth >= occ.z) ? 1.0 : 0.0) * smoothstep(1.0, 0.0, distance);
+					float geometryFactor = max(0.0,dot(occDir, normal)*dot(-occDir,occNormal));
+					if(occTexCoord.x<0.0 || occTexCoord.x > 1.0 || occTexCoord.y < 0.0 || occTexCoord.y > 1.0)
+						invisibility = 0.0;
+
+					ssdo += mix(sky, occColor * geometryFactor, invisibility);
 					ssdo_amb += occColor * geometryFactor;
 					ssao += invisibility;
 
@@ -247,7 +236,7 @@
 				ssdo_amb = max(vec4(0.0),ssdo_amb/max(float(count),1.0));
 				ssao = 1.0-ssao/max(float(count),1.0);
 				gl_FragColor=gammaCorrect(ssdo);
-				gl_FragColor.a=ssao;
+				gl_FragColor.a=pow(ssao,0.5);
 			}
 		</script>
 		<script id="ssdo-vs" type="x-shader/x-vertex">
@@ -267,9 +256,15 @@
 			varying vec2 texmap;
 			varying vec3 position;
 			varying vec3 normal;
+			varying vec3 normal2;
 
 			void main(void) {
-				gl_FragData[0]=vec4(mix(0.5,1.0,normal.y/2.0+0.5),1.0,mix(0.5,1.0,normal.y/2.0+0.5),1.0);
+				if(normal2.z>0.5)
+					gl_FragData[0] = vec4(1.0);
+				else if(normal2.z>-0.5)
+					gl_FragData[0] = vec4(0.0,1.0,0.0,1.0);
+				else
+					gl_FragData[0] = vec4(1.0, 0.0, 0.0, 1.0);
 				gl_FragData[1]=vec4(position,1.0);
 				gl_FragData[2]=vec4(normal,1.0);
 			}
@@ -283,6 +278,7 @@
 			varying vec2 texmap;
 			varying vec3 position;
 			varying vec3 normal;
+			varying vec3 normal2;
 			uniform mat4 uMVMatrix;
 			uniform mat4 uNMVMatrix;
 			uniform mat4 uPMatrix;
@@ -301,15 +297,16 @@
 				return outMatrix;
 			}
 			void main(void) {
-				texmap=aVertexNormal.yz/2.0+0.5;
+				texmap = aVertexTexmap;
+				normal2 = aVertexNormal;
 				vec3 norm=normalize((uNMVMatrix* vec4(aVertexNormal, 1.0)).xyz);
-				vec3 tangent=normalize((uNMVMatrix* vec4(aVertexTangent, 1.0)).xyz);
-				vec3 binorm=normalize((uNMVMatrix* vec4(aVertexBinormal, 1.0)).xyz);
-				mat3 TBN = transpose(mat3(
-					tangent,
-					binorm,
-					norm
-				));
+				// vec3 tangent=normalize((uNMVMatrix* vec4(aVertexTangent, 1.0)).xyz);
+				// vec3 binorm=normalize((uNMVMatrix* vec4(aVertexBinormal, 1.0)).xyz);
+				// mat3 TBN = transpose(mat3(
+				// 	tangent,
+				// 	binorm,
+				// 	norm
+				// ));
 				vec4 position4 = uMVMatrix * vec4(aVertexPosition, 1.0);
 				position = position4.xyz;
 				normal = norm;
@@ -318,9 +315,9 @@
 		</script>
 		<script type="text/javascript">
 			"use strict";
-			function initBuffers() {
-				var vertices = [
-					1.0, -1.0,  -1.0,
+			function cubeV(size = 1.0){
+					var buffer = [
+						1.0, -1.0,  -1.0,
 					-1.0, -1.0,  -1.0,
 					-1.0,  1.0,  -1.0,
 
@@ -371,9 +368,126 @@
 
 					-1.0, -1.0,  1.0,
 					-1.0, -1.0,  -1.0,
-					 1.0, -1.0,  1.0,
+					 1.0, -1.0,  1.0];
+				for(var i in buffer)
+					buffer[i]*=size;
+				return buffer;
+			}
+			function cubeN(){
+				return [
+				0.0, 0.0, -1.0,
+				0.0, 0.0, -1.0,
+				0.0, 0.0, -1.0,
+
+				0.0, 0.0, -1.0,
+				0.0, 0.0, -1.0,
+				0.0, 0.0, -1.0,
 
 
+				0.0, 0.0,  1.0,
+				0.0, 0.0,  1.0,
+				0.0, 0.0,  1.0,
+
+				0.0, 0.0,  1.0,
+				0.0, 0.0,  1.0,
+				0.0, 0.0,  1.0,
+
+
+				-1.0, 0.0,  0.0,
+				-1.0, 0.0,  0.0,
+				-1.0, 0.0,  0.0,
+
+				-1.0, 0.0,  0.0,
+				-1.0, 0.0,  0.0,
+				-1.0, 0.0,  0.0,
+
+
+				1.0, 0.0,  0.0,
+				1.0, 0.0,  0.0,
+				1.0, 0.0,  0.0,
+
+				1.0, 0.0,  0.0,
+				1.0, 0.0,  0.0,
+				1.0, 0.0,  0.0,
+
+
+				0.0, 1.0, 0.0,
+				0.0, 1.0, 0.0,
+				0.0, 1.0, 0.0,
+
+				0.0, 1.0, 0.0,
+				0.0, 1.0, 0.0,
+				0.0, 1.0, 0.0,
+
+
+				0.0, -1.0, 0.0,
+				0.0, -1.0, 0.0,
+				0.0, -1.0, 0.0,
+
+				0.0, -1.0, 0.0,
+				0.0, -1.0, 0.0,
+				0.0, -1.0, 0.0];
+			}
+			function cubeT(size = 1.0){
+				var buffer = [
+					2.0, 0.0,
+				0.0, 0.0,
+				0.0,  2.0,
+
+				2.0, 2.0,
+				2.0, 0.0,
+				0.0,  2.0,
+
+
+				0.0, 0.0,
+				2.0, 0.0,
+				2.0,  2.0,
+
+				0.0, 2.0,
+				0.0, 0.0,
+				2.0,  2.0,
+
+
+				2.0,  0.0,
+				0.0,  0.0,
+				0.0,  2.0,
+
+				2.0,  2.0,
+				2.0,  0.0,
+				0.0,  2.0,
+
+
+				0.0,  0.0,
+				2.0,  0.0,
+				2.0,  2.0,
+
+				0.0,  2.0,
+				0.0,  0.0,
+				2.0,  2.0,
+
+
+				2.0,  0.0,
+				0.0,  0.0,
+				0.0,   2.0,
+
+				2.0,   2.0,
+				2.0,  0.0,
+				0.0,  2.0,
+
+
+				0.0,   0.0,
+				2.0,   0.0,
+				2.0,  2.0,
+
+				0.0,   2.0,
+				0.0,   0.0,
+				2.0,   2.0];
+				for(var i in buffer)
+ 					buffer[i]*=size/2.0;
+ 				return buffer;
+			}
+			function initBuffers() {
+				var vertices = cubeV().concat([
 					2.0,  0.0, -2.0,
 					-2.0,  0.0, -2.0,
 					-2.0, 0.0,  2.0,
@@ -382,102 +496,27 @@
 					2.0, 0.0, -2.0,
 					-2.0, 0.0,  2.0,
 
-					0.1, -0.1,  -0.1,
-					-0.1, -0.1,  -0.1,
-					-0.1,  0.1,  -0.1,
 
-					0.1, 0.1,  -0.1,
-					0.1, -0.1,  -0.1,
-					-0.1,  0.1,  -0.1,
+					-1.0,  1.0, 1.0,
+					1.0,  1.0, 1.0,
+					-1.0, 0.0,  2.0,
 
-
-					-0.1, -0.1,  0.1,
-					0.1, -0.1,  0.1,
-					0.1,  0.1,  0.1,
-
-					-0.1, 0.1,  0.1,
-					-0.1, -0.1,  0.1,
-					0.1,  0.1,  0.1,
-
-
-					-0.1, 0.1,  -0.1,
-					-0.1, -0.1,  -0.1,
-					-0.1,  -0.1,  0.1,
-
-					-0.1, 0.1,  0.1,
-					-0.1, 0.1,  -0.1,
-					-0.1,  -0.1,  0.1,
-
-
-					0.1, -0.1,  -0.1,
-					0.1, 0.1,  -0.1,
-					0.1,  0.1,  0.1,
-
-					0.1, -0.1,  0.1,
-					0.1, -0.1,  -0.1,
-					0.1,  0.1,  0.1,
-
-
-					0.1,  0.1, -0.1,
-					-0.1,  0.1, -0.1,
-					-0.1, 0.1,  0.1,
-
-					0.1, 0.1,  0.1,
-					0.1, 0.1, -0.1,
-					-0.1, 0.1,  0.1,
-
-
-					-0.1, -0.1,  -0.1,
-					0.1, -0.1,  -0.1,
-					0.1, -0.1,  0.1,
-
-					-0.1, -0.1,  0.1,
-					-0.1, -0.1,  -0.1,
-					 0.1, -0.1,  0.1,
-				];
-				for(var i=14*9; i<vertices.length; i+=3){
-					vertices[i+1]+=0.5;
-						vertices[i+2]+=1.2;
+					1.0, 1.0, 1.0,
+					1.0, 0.0, 2.0,
+					-1.0, 0.0, 2.0,
+				])
+				var v2 = cubeV(0.1);
+				for(var i=0; i<v2.length; i+=3){
+					v2[i+1]+=0.5;
+					v2[i+2]+=1.15;
+				}
+				vertices = vertices.concat(v2);
+				for(var i=0; i<vertices.length; i+=3){
+					vertices[i+2]-=1.0;
 				}
 				renderer3d.addBuffer(vertices,3,shader3d.aVertexPosition);
 
-				var normals = [
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-
-
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-
-
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-
-
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-
-
+				var normals = cubeN().concat([
 					0.0, 1.0, 0.0,
 					0.0, 1.0, 0.0,
 					0.0, 1.0, 0.0,
@@ -487,114 +526,17 @@
 					0.0, 1.0, 0.0,
 
 
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
+					0.0, -1.0, -1.0,
+					0.0, -1.0, -1.0,
+					0.0, -1.0, -1.0,
 
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-
-
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-
-
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-
-
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-
-
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-
-
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-				];
+					0.0, -1.0, -1.0,
+					0.0, -1.0, -1.0,
+					0.0, -1.0, -1.0,
+				]).concat(cubeN());
 				renderer3d.addBuffer(normals,3,shader3d.aVertexNormal);
 
-				var texmap = [
-					2.0, 0.0,
-					0.0, 0.0,
-					0.0,  2.0,
-
-					2.0, 2.0,
-					2.0, 0.0,
-					0.0,  2.0,
-
-
-					0.0, 0.0,
-					2.0, 0.0,
-					2.0,  2.0,
-
-					0.0, 2.0,
-					0.0, 0.0,
-					2.0,  2.0,
-
-
-					2.0,  0.0,
-					0.0,  0.0,
-					0.0,  2.0,
-
-					2.0,  2.0,
-					2.0,  0.0,
-					0.0,  2.0,
-
-
-					0.0,  0.0,
-					2.0,  0.0,
-					2.0,  2.0,
-
-					0.0,  2.0,
-					0.0,  0.0,
-					2.0,  2.0,
-
-
+				var texmap = cubeT().concat([
 					2.0,  0.0,
 					0.0,  0.0,
 					0.0,   2.0,
@@ -604,75 +546,14 @@
 					0.0,  2.0,
 
 
-					0.0,   0.0,
-					2.0,   0.0,
-					2.0,  2.0,
-
+					0.0,  0.0,
+					2.0,  0.0,
 					0.0,   2.0,
-					0.0,   0.0,
-					 2.0,   2.0,
 
 					2.0,  0.0,
-					0.0,  0.0,
-					0.0,   2.0,
-
 					2.0,   2.0,
-					2.0,  0.0,
 					0.0,  2.0,
-
-					2.0, 0.0,
-					0.0, 0.0,
-					0.0,  2.0,
-
-					2.0, 2.0,
-					2.0, 0.0,
-					0.0,  2.0,
-
-
-					0.0, 0.0,
-					2.0, 0.0,
-					2.0,  2.0,
-
-					0.0, 2.0,
-					0.0, 0.0,
-					2.0,  2.0,
-
-
-					2.0,  0.0,
-					0.0,  0.0,
-					0.0,  2.0,
-
-					2.0,  2.0,
-					2.0,  0.0,
-					0.0,  2.0,
-
-
-					0.0,  0.0,
-					2.0,  0.0,
-					2.0,  2.0,
-
-					0.0,  2.0,
-					0.0,  0.0,
-					2.0,  2.0,
-
-
-					2.0,  0.0,
-					0.0,  0.0,
-					0.0,   2.0,
-
-					2.0,   2.0,
-					2.0,  0.0,
-					0.0,  2.0,
-
-
-					0.0,   0.0,
-					2.0,   0.0,
-					2.0,  2.0,
-
-					0.0,   2.0,
-					0.0,   0.0,
-					 2.0,   2.0,
-				];
+				]).concat(cubeT());
 				renderer3d.addBuffer(texmap,2,shader3d.aVertexTexmap);
 
 				var tangents = [];
@@ -766,8 +647,10 @@
 			var angleX=0.0;
 			var angleY=0.0;
 			var radios;
+			var skyColor;
 			function webGLStart() {
 				radios=document.getElementsByName('mode');
+				skyColor=document.getElementById('skyColor');
 				var canvas = document.getElementById("canvas");
 				canvas.onmousedown = handleMouseDown;
 				document.onmouseup = handleMouseUp;
@@ -831,8 +714,10 @@
 					var pMatrix = mat4.create();
 					mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
 					gl.uniformMatrix4fv(shaderProgram.projectionMatrix, false, pMatrix);
+					gl.uniform3f(shaderProgram.skyColor, skyColor.jscolor.rgb[0]/255.0, skyColor.jscolor.rgb[1]/255.0, skyColor.jscolor.rgb[2]/255.0);
 				});
 				ssdoFilter.shader.addUniform("projectionMatrix");
+				ssdoFilter.shader.addUniform("skyColor");
 
 				blurXFilter = new TextureFilter(1024,1024,{texture:ssdoFilter.output},"blurX",gl);
 				blurYFilter = new TextureFilter(1024,1024,{texture:blurXFilter.output},"blurY",gl);
