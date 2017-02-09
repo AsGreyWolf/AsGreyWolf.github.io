@@ -7,6 +7,7 @@
 		<input type="radio" name="mode" value="2" > SSAO map<br>
 		<input type="radio" name="mode" value="3" > SSDO<br>
 		<input type="radio" name="mode" value="4" > SSDO map<br>
+		<input type="radio" name="mode" value="5" > G-buffer<br>
 		Sky: <input class="jscolor" id="skyColor" value="7EC0EE"><br>
 		Sun: <input class="jscolor" id="sunColor" value="FFD440"><br></center>
 		<script src="jscolor.min.js"></script>
@@ -150,6 +151,23 @@
 				if(mode==4)
 					color = ssdo; //SSDO map mode
 
+				if(mode==5) {
+					vec2 factor = (texmap - 0.5) * 64.0;
+					color = vec4(mix(
+						mix(
+							color.rgb,
+							ssdo.rgb,
+							clamp(factor.x,0.0,1.0)
+						),
+						mix(
+							normal,
+							position,
+							clamp(factor.x,0.0,1.0)
+						),
+						clamp(factor.y,0.0,1.0)
+					), 1.0);
+				}
+
 				gl_FragColor = gammaCorrect(color);
 				gl_FragColor.a=1.0;
 			}
@@ -229,7 +247,7 @@
 
 					float distance =  abs(occPos.z - position.z) / max_distance;
 					float invisibility = ((occPos.z >= occ.z) ? 1.0 : 0.0) * smoothstep(1.0, 0.0, distance);
-					float geometryFactor = max(0.0,dot(occDir, normal)*dot(-occDir,occNormal));
+					float geometryFactor = max(0.0,dot(occDir, normal))*max(0.0,dot(-occDir,occNormal));
 					if(occTexCoord.x<0.0 || occTexCoord.x > 1.0 || occTexCoord.y < 0.0 || occTexCoord.y > 1.0)
 						invisibility = 0.0;
 
@@ -728,7 +746,7 @@
 
 				blurXFilter = new TextureFilter(1024,1024,{texture:ssdoFilter.output},"blurX",gl);
 				blurYFilter = new TextureFilter(1024,1024,{texture:blurXFilter.output},"blurY",gl);
-				screenFilter = new Filter({colorTexture:texColor3d,ssdoTexture:texPos3d,normalTexture:texNorm3d,ssdoTexture:blurYFilter.output},"shader2d",gl,
+				screenFilter = new Filter({colorTexture:texColor3d,positionTexture:texPos3d,normalTexture:texNorm3d,ssdoTexture:blurYFilter.output},"shader2d",gl,
 				function(shaderProgram){
 					for (var i = 0, length = radios.length; i < length; i++) {
 						gl.uniform3f(shaderProgram.skyColor, skyColor.jscolor.rgb[0]/255.0, skyColor.jscolor.rgb[1]/255.0, skyColor.jscolor.rgb[2]/255.0);
