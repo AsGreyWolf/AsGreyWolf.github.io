@@ -7,7 +7,7 @@ function initGL(canvas) {
 		gl.viewportWidth = canvas.width;
 		gl.viewportHeight = canvas.height;
 		gl.drawBuffersExt = gl.getExtension('WEBGL_draw_buffers');
-		gl.floatExt = gl.getExtension('OES_texture_float');
+		gl.floatExt = gl.getExtension('OES_texture_half_float');
 	} catch (e) {
 	}
 	if (!gl) {
@@ -56,7 +56,7 @@ function Texture(image, gl, flags = 0, width = undefined, height = undefined) {
 			internalFormat = gl.LUMINANCE;
 		}
 		if (float) {
-			type = gl.FLOAT;
+			type = gl.floatExt.HALF_FLOAT_OES;
 		}
 		if (image === null)
 			gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, format,
