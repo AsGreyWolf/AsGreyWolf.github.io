@@ -10,18 +10,24 @@
 		}
 		nav {
 			text-align: left;
-			background-color: #000000;
+			background-color: #000;
 		}
 		nav > ul {
-			background-color: #000000;
+			text-align: center;
+			background-color: #000;
 			min-height: 0;
+		}
+		nav > ul > li > a::after {
+			background-color: #FFF;
 		}
 		article {
 			min-width: 200px;
 			width: 20%;
 			min-height: 20%;
-			padding: 10px 10px 10px 10px;
-			margin-bottom: 6px;
+			padding: 30px 30px 30px 30px;
+			margin-bottom: 30px;
+			margin-left: 10px;
+			margin-right: 10px;
 		}
 		.wrap {
 			flex-wrap: wrap !important;
@@ -43,10 +49,10 @@
 			<h1>SHOP</h1>
 			<ul class="adaptive">
 				<li>
-					Товары
+					<a href="shop.html">Товары</a>
 				</li>
 				<li>
-					Корзина
+					<a href="shop.html">Корзина</a>
 				</li>
 			</ul>
 		</nav>
