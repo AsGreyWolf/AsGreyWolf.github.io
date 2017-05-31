@@ -11,104 +11,107 @@
 	<div id="canvas2">
 	</div>
 	<script type="text/javascript">
-		var data = null;
-		var graph = null;
-
-		function custom(x, y) {
-			return (Math.sin(x) * Math.cos(y));
+		function draw2d(canvas, data, fill = true) {
+			var counter = 0;
+			var dataset = new vis.DataSet();
+			for (var i = 0; i < data.length; i++)
+				dataset.add({
+					id: counter++,
+					x: data[i].x * 1000,
+					y: data[i].y
+				});
+			var options = {
+				width: '600px',
+				height: '600px',
+				sort: false,
+				drawPoints: {
+					style: 'circle'
+				}
+			};
+			if (!fill) options.style = 'points';
+			var graph = new vis.Graph2d(canvas, dataset, options);
+			graph.timeAxis.options.format.minorLabels = {
+				millisecond: "x",
+				second: "X",
+				minute: "X",
+				hour: "X",
+				weekday: "X",
+				day: "X",
+				month: "X",
+				year: "X"
+			};
+			graph.timeAxis.options.format.majorLabels = {
+				millisecond: "X",
+				second: "",
+				minute: "",
+				hour: "",
+				weekday: "",
+				day: "",
+				month: "",
+				year: ""
+			};
 		}
 
-		// Create and populate a data table.
-		data = new vis.DataSet();
-		// create some nice looking data with sin/cos
-		var counter = 0;
+		function draw3d(canvas, data, fill = true) {
+			var counter = 0;
+			var dataset = new vis.DataSet();
+			for (var i = 0; i < data.length; i++)
+				dataset.add({
+					id: counter++,
+					x: data[i].x,
+					y: data[i].y,
+					z: data[i].z,
+					style: data[i].z
+				});
+			var graph = new vis.Graph3d(canvas, dataset, {
+				width: '600px',
+				height: '600px',
+				showAnimationControls: true,
+				showPerspective: true,
+				showGrid: true,
+				showShadow: false,
+				keepAspectRatio: true,
+				verticalRatio: 0.5,
+				xLabel: "X",
+				yLabel: "Y",
+				zLabel: "Z",
+				style: fill ? 'surface' : 'dot-color'
+			});
+		}
+
+
+
+
+
+
+
+
+		var data = [];
 		var steps = 50; // number of datapoints will be steps*steps
 		var axisMax = 3.14;
 		var axisStep = axisMax / steps;
 		for (var t = 0; t < axisMax; t += axisStep) {
-			data.add({
-				id: counter++,
-				x: Math.sin(t * 2) * 1000,
-				y: Math.cos(t),
-				style: value
+			data.push({
+				x: Math.sin(t * 2),
+				y: Math.cos(t)
 			});
 		}
+		draw2d(document.getElementById('canvas'), data);
 
-		// specify options
-		var options = {
-			width: '600px',
-			height: '600px',
-			sort: false,
-		};
-
-		// Instantiate our graph object.
-		var container = document.getElementById('canvas');
-		graph = new vis.Graph2d(container, data, options);
-		graph.timeAxis.options.format.minorLabels = {
-			millisecond: "x",
-			second: "X",
-			minute: "X",
-			hour: "X",
-			weekday: "X",
-			day: "X",
-			month: "X",
-			year: "X"
-		};
-		graph.timeAxis.options.format.majorLabels = {
-			millisecond: "X",
-			second: "",
-			minute: "",
-			hour: "",
-			weekday: "",
-			day: "",
-			month: "",
-			year: ""
-		};
-		// graph.timeAxis.options.showMajorLabels = false;
-		// graph.timeAxis.step = 0.01;
-
-		var data3d = null;
-		var graph3d = null;
-
-		// Create and populate a data table.
-		data3d = new vis.DataSet();
-		// create some nice looking data with sin/cos
-		counter = 0;
+		data = [];
 		steps = 50; // number of datapoints will be steps*steps
 		axisMax = 314 / 50;
 		axisStep = axisMax / steps;
 		for (var x = 0; x < axisMax; x += axisStep) {
 			for (var y = 0; y < axisMax; y += axisStep) {
-				var value = custom(x, y);
-				data3d.add({
-					id: counter++,
+				data.push({
 					x: x,
 					y: y,
-					z: value,
-					style: value
+					z: Math.sin(x) * Math.cos(y)
 				});
 			}
 		}
-
-		// specify options
-		var options3d = {
-			width: '600px',
-			height: '600px',
-			style: 'surface',
-			showAnimationControls: true,
-			showPerspective: true,
-			showGrid: true,
-			showShadow: false,
-			keepAspectRatio: true,
-			verticalRatio: 0.5,
-			xLabel: "X",
-			yLabel: "Y",
-			zLabel: "Z"
-		};
-
-		// Instantiate our graph object.
-		var container3d = document.getElementById('canvas2');
-		graph3d = new vis.Graph3d(container3d, data3d, options3d);
+		draw3d(document.getElementById('canvas2'), data);
 	</script>
 </body>
 
