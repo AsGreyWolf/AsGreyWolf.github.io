@@ -23,12 +23,12 @@
 		// create some nice looking data with sin/cos
 		var counter = 0;
 		var steps = 50; // number of datapoints will be steps*steps
-		var axisMax = 314 / 50;
+		var axisMax = 3.14;
 		var axisStep = axisMax / steps;
 		for (var t = 0; t < axisMax; t += axisStep) {
 			data.add({
 				id: counter++,
-				x: Math.sin(t) * 2 * 1000,
+				x: Math.sin(t * 2) * 1000,
 				y: Math.cos(t),
 				style: value
 			});
@@ -37,7 +37,8 @@
 		// specify options
 		var options = {
 			width: '600px',
-			height: '600px'
+			height: '600px',
+			sort: false,
 		};
 
 		// Instantiate our graph object.
