@@ -1,0 +1,114 @@
+<html>
+
+<head>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.19.1/vis.min.js"></script>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.19.1/vis.min.css"></link>
+</head>
+
+<body>
+	<div id="canvas">
+	</div>
+	<div id="canvas2">
+	</div>
+	<script type="text/javascript">
+		var data = null;
+		var graph = null;
+
+		function custom(x, y) {
+			return (Math.sin(x) * Math.cos(y));
+		}
+
+		// Create and populate a data table.
+		data = new vis.DataSet();
+		// create some nice looking data with sin/cos
+		var counter = 0;
+		var steps = 50; // number of datapoints will be steps*steps
+		var axisMax = 314 / 50;
+		var axisStep = axisMax / steps;
+		for (var t = 0; t < axisMax; t += axisStep) {
+			data.add({
+				id: counter++,
+				x: Math.sin(t) * 2 * 1000,
+				y: Math.cos(t),
+				style: value
+			});
+		}
+
+		// specify options
+		var options = {
+			width: '600px',
+			height: '600px'
+		};
+
+		// Instantiate our graph object.
+		var container = document.getElementById('canvas');
+		graph = new vis.Graph2d(container, data, options);
+		graph.timeAxis.options.format.minorLabels = {
+			millisecond: "x",
+			second: "X",
+			minute: "X",
+			hour: "X",
+			weekday: "X",
+			day: "X",
+			month: "X",
+			year: "X"
+		};
+		graph.timeAxis.options.format.majorLabels = {
+			millisecond: "X",
+			second: "",
+			minute: "",
+			hour: "",
+			weekday: "",
+			day: "",
+			month: "",
+			year: ""
+		};
+		// graph.timeAxis.options.showMajorLabels = false;
+		// graph.timeAxis.step = 0.01;
+
+		var data3d = null;
+		var graph3d = null;
+
+		// Create and populate a data table.
+		data3d = new vis.DataSet();
+		// create some nice looking data with sin/cos
+		counter = 0;
+		steps = 50; // number of datapoints will be steps*steps
+		axisMax = 314 / 50;
+		axisStep = axisMax / steps;
+		for (var x = 0; x < axisMax; x += axisStep) {
+			for (var y = 0; y < axisMax; y += axisStep) {
+				var value = custom(x, y);
+				data3d.add({
+					id: counter++,
+					x: x,
+					y: y,
+					z: value,
+					style: value
+				});
+			}
+		}
+
+		// specify options
+		var options3d = {
+			width: '600px',
+			height: '600px',
+			style: 'surface',
+			showAnimationControls: true,
+			showPerspective: true,
+			showGrid: true,
+			showShadow: false,
+			keepAspectRatio: true,
+			verticalRatio: 0.5,
+			xLabel: "X",
+			yLabel: "Y",
+			zLabel: "Z"
+		};
+
+		// Instantiate our graph object.
+		var container3d = document.getElementById('canvas2');
+		graph3d = new vis.Graph3d(container3d, data3d, options3d);
+	</script>
+</body>
+
+</html>
