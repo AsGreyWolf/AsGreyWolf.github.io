@@ -19,28 +19,24 @@
 			uniform sampler2D texture;
 			varying vec2 texmap;
 
-			vec4 blur(vec2 pos, vec2 v) {
+			vec4 blur(in vec2 pos){
 				const float radius = 20.0;
-				vec3 texel_radius = vec3(v.xy, radius);
-				float INV_SQRT_2PI_X3 = 1.1968268412042980338198381798031;
-				float exp_value = -4.5 / radius / radius;
-				float sqrt_value = INV_SQRT_2PI_X3 / radius;
-				float sum = 0.0;
-				vec4 value = vec4(0.0,0.0,0.0,0.0);
-				for(float x = 1.0; x<=radius; x+=1.0){
-					float currentScale = exp(exp_value * x * x);
-					sum += currentScale;
-					vec2 dudv = texel_radius.xy * x;
-					value +=
-					    currentScale * (texture2D(texture, pos - dudv) + texture2D(texture, pos + dudv));
+				const vec2 dir = vec2(0.0,0.003);
+
+				const float INV_SQRT_2PI_X3 = 1.1968268412042980338198381798031;
+				vec4 result = vec4(0.0);
+				vec2 dpos = vec2(0,0);
+				float expFactor = -4.5 / radius / radius;
+				for(float x=0.0; x<=radius; x+=1.0){
+					vec4 color = texture2D(texture, pos - dpos) + texture2D(texture, pos + dpos);
+					result += color * exp(expFactor * x * x);
+					dpos += dir;
 				}
-				float correction = 1.0 / sqrt_value - 2.0 * sum;
-				value += texture2D(texture, pos) * correction;
-				return value * sqrt_value;
+				return INV_SQRT_2PI_X3 / radius * result;
 			}
 
 			void main(void) {
-				gl_FragColor = blur(texmap,vec2(0.0,0.001));
+				gl_FragColor = blur(texmap);
 			}
 		</script>
 		<script id="blurY-vs" type="x-shader/x-vertex">
@@ -59,28 +55,25 @@
 			uniform sampler2D texture;
 			varying vec2 texmap;
 
-			vec4 blur(vec2 pos, vec2 v) {
+			vec4 blur(in vec2 pos){
 				const float radius = 20.0;
-				vec3 texel_radius = vec3(v.xy, radius);
-				float INV_SQRT_2PI_X3 = 1.1968268412042980338198381798031;
-				float exp_value = -4.5 / radius / radius;
-				float sqrt_value = INV_SQRT_2PI_X3 / radius;
-				float sum = 0.0;
-				vec4 value = vec4(0.0,0.0,0.0,0.0);
-				for(float x = 1.0; x<=radius; x+=1.0){
-					float currentScale = exp(exp_value * x * x);
-					sum += currentScale;
-					vec2 dudv = texel_radius.xy * x;
-					value +=
-					    currentScale * (texture2D(texture, pos - dudv) + texture2D(texture, pos + dudv));
+				const vec2 dir = vec2(0.003, 0.0);
+
+				const float INV_SQRT_2PI_X3 = 1.1968268412042980338198381798031;
+
+				vec4 result = vec4(0.0);
+				vec2 dpos = vec2(0.0);
+				float expFactor = -4.5 / radius / radius;
+				for(float x=0.0; x<=radius; x+=1.0){
+					vec4 color = texture2D(texture, pos - dpos) + texture2D(texture, pos + dpos);
+					result += color * exp(expFactor * x * x);
+					dpos += dir;
 				}
-				float correction = 1.0 / sqrt_value - 2.0 * sum;
-				value += texture2D(texture, pos) * correction;
-				return value * sqrt_value;
+				return INV_SQRT_2PI_X3 / radius * result;
 			}
 
 			void main(void) {
-				gl_FragColor = blur(texmap,vec2(0.001,0.0));
+				gl_FragColor = blur(texmap);
 			}
 		</script>
 		<script id="blurX-vs" type="x-shader/x-vertex">
@@ -124,7 +117,7 @@
 				vec3 L = normalize(vec3(0.0,4.0,-3.0)-position);
 				vec3 E = normalize(position);
 
-				const float shininess=64.0;
+				const float shininess = 64.0;
 				float specIntensity = 0.0;//clamp(pow(max(dot(normal,normalize(L - E)),0.0),shininess/4.0),0.0,1.0);
 				vec4 specColor = vec4(1.0);
 
@@ -202,7 +195,7 @@
 			float rand(in vec2 co) {
 				return fract(sin(dot(normalize(co.xy), vec2(12.9898, 78.233))) * 43758.5453);
 			}
-			const int samples = 16;
+			const int samples = 8;
 			vec3 rand3(vec3 co, int i){
 				co/=10000.0;
 				float ci = float(i)/float(samples);
@@ -657,16 +650,20 @@
 			var blurXFilter;
 			var blurYFilter;
 			var screenFilter;
+			var counter = 0;
 			function tick(){
 				requestAnimFrame(tick);
 				fbo3d.bind();
 				shader3d.bind();
 				renderer3d.draw();
 				fbo3d.unbind();
-				ssdoFilter.draw();
-				blurXFilter.draw();
-				blurYFilter.draw();
+				if(counter%2==0){
+					ssdoFilter.draw();
+					blurXFilter.draw();
+					blurYFilter.draw();
+				}
 				screenFilter.draw();
+				counter++;
 			}
 
 			var angleX=0.0;
