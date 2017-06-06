@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html>
 	<body onload="webGLStart();" style="width:100%; height:100%;">
-		<center><canvas id="canvas" style="border: none;" width="1024px" height="768px"></canvas></center>
+		<center><canvas id="canvas" style="border: none;" width="1024px" height="768px"></canvas><br>
+		<input type="checkbox" id="mode" value="1" > textured<br>
+		Albedo: <input class="jscolor" id="albedo" value="ffb54a"><br>
+		Roughness: <input type="range" id="roughness" value="20"><br>
+		Metallic: <input type="range" id="metallic" value="100"><br></center>
 		<script src="jscolor.min.js"></script>
 		<script type="text/javascript" src="gltools.js"></script>
 		<script type="text/javascript" src="gl.js"></script>
@@ -13,6 +17,10 @@
 			varying vec2 texmap;
 			varying vec3 position;
 			varying vec3 normal;
+			uniform int mode;
+			uniform vec3 albedoU;
+			uniform float metallicU;
+			uniform float roughnessU;
 			uniform sampler2D colorTexture;
 			uniform sampler2D metallicTexture;
 			uniform sampler2D roughnessTexture;
@@ -49,7 +57,7 @@
 				vec3 l = normalize(w1);
 				vec3 h = normalize(v + l);
 				float denom = 4.0 * max(dot(n, w0), 0.0) * max(dot(n, w1), 0.0) + 0.0001;
-				return F(f0, h, v) * G(n, v, l, a)  * NDF(n, h, a)/ denom;
+				return F(f0, h, v) * G(n, v, l, a) * NDF(n, h, a) / denom;
 			}
 
 			vec3 cookTorranceBRDF(vec3 albedo, float a, float metallic, vec3 n, vec3 w0, vec3 w1) {
@@ -58,18 +66,24 @@
 				vec3 h = normalize(v + l);
 				vec3 f0 = vec3(0.04);
 				f0      = mix(f0, albedo, metallic);
-				vec3 Ks = F(f0, h, normalize(w0));
-				// Ks = vec3(0.9);
+				vec3 Ks = F(f0, h, v);
+				// Ks = vec3(1.0);
 				vec3 Kd = 1.0 - Ks;
 				Kd *= 1.0 - metallic;
-				return (Kd * albedo / PI + Ks * cookTorranceSpec(n, w0, w1, a, f0)) * max(dot(n, w1),0.0) / length(w1);
+				return (Kd * albedo / PI + Ks * cookTorranceSpec(n, w0, w1, a, f0)) * max(dot(n, l),0.0);
 			}
 
 			void main(void) {
-				vec3 albedo = pow(texture2D(colorTexture, texmap).rgb, vec3(2.2));
-				float roughness = texture2D(roughnessTexture, texmap).r;
-				float metallic = texture2D(metallicTexture, texmap).r;
-				vec3 color = cookTorranceBRDF(albedo, roughness, metallic, normal, -position, vec3(2.0,2.0,2.0))*150.0;
+				vec3 albedo = pow(albedoU, vec3(2.2));
+				float roughness = roughnessU;
+				float metallic = metallicU;
+				if(mode == 1){
+					albedo = pow(texture2D(colorTexture, texmap).rgb, vec3(2.2));
+					roughness = texture2D(roughnessTexture, texmap).r;
+					metallic = texture2D(metallicTexture, texmap).r;
+				}
+				vec3 color = cookTorranceBRDF(albedo, roughness, metallic, normal, -position, vec3(0.0,0.0,1.0))*150.0+
+				cookTorranceBRDF(albedo, roughness, metallic, normal, -position, vec3(2.0,2.0,-2.0))*vec3(0.0,0.0,1.0)*70.0;
 				color = color / (color + vec3(1.0));
 				color=pow(color,vec3(1.0/2.2));
 				gl_FragColor = vec4(color, 1.0);
@@ -104,7 +118,7 @@
 				return outMatrix;
 			}
 			void main(void) {
-				texmap = aVertexTexmap*2.0;
+				texmap = aVertexTexmap * 2.0;
 				vec3 norm=normalize((uNMVMatrix* vec4(aVertexNormal, 1.0)).xyz);
 				// vec3 tangent=normalize((uNMVMatrix* vec4(aVertexTangent, 1.0)).xyz);
 				// vec3 binorm=normalize((uNMVMatrix* vec4(aVertexBinormal, 1.0)).xyz);
@@ -379,8 +393,16 @@
 
 			var angleX=0.0;
 			var angleY=0.0;
+			var albedoU;
+			var roughnessU;
+			var metallicU;
+			var mode;
 			function webGLStart() {
 				var canvas = document.getElementById("canvas");
+				albedoU = document.getElementById("albedo");
+				roughnessU = document.getElementById("roughness");
+				metallicU = document.getElementById("metallic");
+				mode = document.getElementById("mode");
 				canvas.onmousedown = handleMouseDown;
 				document.onmouseup = handleMouseUp;
 				document.onmousemove = handleMouseMove;
@@ -418,6 +440,11 @@
 					mat4.inverse(nmvMatrix);
 					mat4.transpose(nmvMatrix);
 					gl.uniformMatrix4fv(shaderProgram.uNMVMatrix, false, nmvMatrix);
+
+					gl.uniform3f(shaderProgram.albedoU, albedoU.jscolor.rgb[0]/255.0, albedoU.jscolor.rgb[1]/255.0, albedoU.jscolor.rgb[2]/255.0);
+					gl.uniform1f(shaderProgram.metallicU, metallicU.value/100.0);
+					gl.uniform1f(shaderProgram.roughnessU, roughnessU.value/100.0);
+					gl.uniform1i(shaderProgram.mode, mode.checked ? 1 : 0);
 				});
 				shader3d.addAttribute("aVertexPosition");
 				shader3d.addAttribute("aVertexNormal");
@@ -427,6 +454,10 @@
 				shader3d.addUniform("uPMatrix");
 				shader3d.addUniform("uMVMatrix");
 				shader3d.addUniform("uNMVMatrix");
+				shader3d.addUniform("albedoU");
+				shader3d.addUniform("metallicU");
+				shader3d.addUniform("roughnessU");
+				shader3d.addUniform("mode");
 				shader3d.addTextureUniform("colorTexture");
 				shader3d.addTextureUniform("roughnessTexture");
 				shader3d.addTextureUniform("metallicTexture");
