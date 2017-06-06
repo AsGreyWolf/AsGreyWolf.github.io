@@ -5,7 +5,8 @@
 		<input type="checkbox" id="mode" value="1" > textured<br>
 		Albedo: <input class="jscolor" id="albedo" value="ffb54a"><br>
 		Roughness: <input type="range" id="roughness" value="20"><br>
-		Metallic: <input type="range" id="metallic" value="100"><br></center>
+		Metallic: <input type="range" id="metallic" value="100"><br>
+		Front light brightness: <input type="range" id="frontLight" value="75"><br></center>
 		<script src="jscolor.min.js"></script>
 		<script type="text/javascript" src="gltools.js"></script>
 		<script type="text/javascript" src="gl.js"></script>
@@ -18,6 +19,7 @@
 			varying vec3 position;
 			varying vec3 normal;
 			uniform int mode;
+			uniform float frontLight;
 			uniform vec3 albedoU;
 			uniform float metallicU;
 			uniform float roughnessU;
@@ -82,7 +84,7 @@
 					roughness = texture2D(roughnessTexture, texmap).r;
 					metallic = texture2D(metallicTexture, texmap).r;
 				}
-				vec3 color = cookTorranceBRDF(albedo, roughness, metallic, normal, -position, vec3(0.0,0.0,1.0))*150.0+
+				vec3 color = cookTorranceBRDF(albedo, roughness, metallic, normal, -position, vec3(0.0,0.0,1.0))*frontLight+
 				cookTorranceBRDF(albedo, roughness, metallic, normal, -position, vec3(2.0,2.0,-2.0))*vec3(0.0,0.0,1.0)*70.0;
 				color = color / (color + vec3(1.0));
 				color=pow(color,vec3(1.0/2.2));
@@ -397,12 +399,14 @@
 			var roughnessU;
 			var metallicU;
 			var mode;
+			var frontLight;
 			function webGLStart() {
 				var canvas = document.getElementById("canvas");
 				albedoU = document.getElementById("albedo");
 				roughnessU = document.getElementById("roughness");
 				metallicU = document.getElementById("metallic");
 				mode = document.getElementById("mode");
+				frontLight = document.getElementById("frontLight");
 				canvas.onmousedown = handleMouseDown;
 				document.onmouseup = handleMouseUp;
 				document.onmousemove = handleMouseMove;
@@ -444,6 +448,7 @@
 					gl.uniform3f(shaderProgram.albedoU, albedoU.jscolor.rgb[0]/255.0, albedoU.jscolor.rgb[1]/255.0, albedoU.jscolor.rgb[2]/255.0);
 					gl.uniform1f(shaderProgram.metallicU, metallicU.value/100.0);
 					gl.uniform1f(shaderProgram.roughnessU, roughnessU.value/100.0);
+					gl.uniform1f(shaderProgram.frontLight, frontLight.value*2.0);
 					gl.uniform1i(shaderProgram.mode, mode.checked ? 1 : 0);
 				});
 				shader3d.addAttribute("aVertexPosition");
@@ -458,6 +463,7 @@
 				shader3d.addUniform("metallicU");
 				shader3d.addUniform("roughnessU");
 				shader3d.addUniform("mode");
+				shader3d.addUniform("frontLight");
 				shader3d.addTextureUniform("colorTexture");
 				shader3d.addTextureUniform("roughnessTexture");
 				shader3d.addTextureUniform("metallicTexture");
