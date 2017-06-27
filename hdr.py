@@ -10,6 +10,7 @@ brightness = 0.2126 * image[..., 0] + \
 image[..., 0] /= brightness
 image[..., 1] /= brightness
 image[..., 2] /= brightness
+print(np.mean(brightness) + 3*(np.var(brightness)**0.5))
 maxbr = 50
 brightness = np.log(brightness * 1000 + 1) / np.log(maxbr * 1000 + 1)
 w, h, dims = image.shape

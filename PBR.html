@@ -13,7 +13,7 @@
 
 		<script id="shader3d-fs" type="x-shader/x-fragment">
 			// #extension GL_EXT_draw_buffers : require
-			precision lowp float;
+			precision highp float;
 			precision lowp sampler2D;
 			varying vec2 texmap;
 			varying vec3 position;
@@ -84,9 +84,8 @@
 				return result;
 			}
 
-			vec3 env(vec4 color) {
+			vec3 env(vec4 color, float maxbr) {
 				color.rgb = pow(color.rgb, vec3(2.2));
-				const float maxbr = 50.0;
 				color.a *=  log(maxbr * 1000.0 + 1.0);
 				color.a = (exp(color.a) - 1.0) / 1000.0;
 				return color.rgb * color.a;
@@ -95,8 +94,8 @@
 			void main(void) {
 				vec3 N = normalize(normal);
 				vec3 ray = reflect(normalize(position), N);
-				vec3 spectacular = env(texture2D(specmap, project(ray))) * 5000.0;
-				vec3 ambient = env(texture2D(envmap, project(N))) * 50.0;
+				vec3 spectacular = env(texture2D(specmap, project(ray)), 287.0) * 1000.0;
+				vec3 ambient = env(texture2D(envmap, project(N)), 30.0) * 100.0;
 				vec3 albedo = pow(albedoU, vec3(2.2));
 				float roughness = roughnessU;
 				float metallic = metallicU;
@@ -106,6 +105,7 @@
 					metallic = texture2D(metallicTexture, texmap).r;
 				}
 				vec3 color = cookTorranceBRDF(albedo, ambient, roughness, metallic, vec3(frontLight), N, -position, vec3(0.0,0.0,1.0)) +
+				// cookTorranceBRDF(albedo, ambient, roughness, metallic, vec3(0.0,0.0,7.0), N, -position, vec3(2.0,2.0,-2.0)) +
 				cookTorranceBRDF(albedo, ambient, roughness, metallic, spectacular, N, -position, ray);
 				color = color / (color + vec3(1.0));
 				color=pow(color,vec3(1.0/2.2));
