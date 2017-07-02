@@ -75,39 +75,13 @@
 		<script type="text/javascript">
 			"use strict";
 			var gl;
-			var shaderProgram;
-			function setUniforms() {
-				gl.uniform1f(shaderProgram.size, sizeSlider.value*5.0+20);
+			function setUniforms(shader) {
+				gl.uniform1f(shader.size, sizeSlider.value*5.0+20);
 			}
-			function initBuffers() {
-				var vertices = [
-					-1.0, -1.0,  0.0,
-					1.0, -1.0,  0.0,
-					-1.0,  1.0,  0.0,
-
-					1.0, -1.0,  0.0,
-					1.0, 1.0,  0.0,
-					-1.0,  1.0,  0.0,
-				];
-				renderer.addBuffer(vertices,3,shaderProgram.aVertexPosition);
-
-				var texmap = [
-					0.0,0.0,
-					1.0,0.0,
-					0.0,1.0,
-
-					1.0,0.0,
-					1.0,1.0,
-					0.0,1.0,
-				];
-				renderer.addBuffer(texmap,2,shaderProgram.aVertexTexmap);
-			}
-			var renderer;
-			var shaderProgram;
+			var noise;
 			function tick(){
 				requestAnimFrame(tick);
-				shaderProgram.bind();
-				renderer.draw();
+				noise.draw();
 			}
 			var sizeSlider;
 			function webGLStart() {
@@ -116,13 +90,8 @@
 				gl.clearColor(0.0, 0.0, 0.0, 1.0);
 				gl.enable(gl.CULL_FACE);
 
-				shaderProgram = new ShaderProgram("shader",gl,setUniforms);
-				shaderProgram.addAttribute("aVertexPosition");
-				shaderProgram.addAttribute("aVertexTexmap");
-				shaderProgram.addUniform("size");
-
-				renderer = new Renderer(gl);
-				initBuffers();
+				noise = new Filter({}, "shader", gl, setUniforms);
+				noise.shader.addUniform("size");
 
 				tick();
 			}

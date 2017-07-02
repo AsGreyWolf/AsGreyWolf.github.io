@@ -10,6 +10,7 @@
 
 		<script type="text/javascript" src="gltools.js"></script>
 		<script type="text/javascript" src="gl.js"></script>
+		<script type="text/javascript" src="models.js"></script>
 		<script id="shader-fs" type="x-shader/x-fragment">
 			precision highp float;
 			precision highp sampler2D;
@@ -244,61 +245,7 @@
 				gl.uniform1i(shaderProgram.gammaCorrection, correctionBox.checked?1:0);
 			}
 			function initBuffers() {
-				var vertices = [
-					1.0, -1.0,  -1.0,
-					-1.0, -1.0,  -1.0,
-					-1.0,  1.0,  -1.0,
-
-					1.0, 1.0,  -1.0,
-					1.0, -1.0,  -1.0,
-					-1.0,  1.0,  -1.0,
-
-
-					-1.0, -1.0,  1.0,
-					1.0, -1.0,  1.0,
-					1.0,  1.0,  1.0,
-
-					-1.0, 1.0,  1.0,
-					-1.0, -1.0,  1.0,
-					1.0,  1.0,  1.0,
-
-
-					-1.0, 1.0,  -1.0,
-					-1.0, -1.0,  -1.0,
-					-1.0,  -1.0,  1.0,
-
-					-1.0, 1.0,  1.0,
-					-1.0, 1.0,  -1.0,
-					-1.0,  -1.0,  1.0,
-
-
-					1.0, -1.0,  -1.0,
-					1.0, 1.0,  -1.0,
-					1.0,  1.0,  1.0,
-
-					1.0, -1.0,  1.0,
-					1.0, -1.0,  -1.0,
-					1.0,  1.0,  1.0,
-
-
-					1.0,  1.0, -1.0,
-					-1.0,  1.0, -1.0,
-					-1.0, 1.0,  1.0,
-
-					1.0, 1.0,  1.0,
-					1.0, 1.0, -1.0,
-					-1.0, 1.0,  1.0,
-
-
-					-1.0, -1.0,  -1.0,
-					1.0, -1.0,  -1.0,
-					1.0, -1.0,  1.0,
-
-					-1.0, -1.0,  1.0,
-					-1.0, -1.0,  -1.0,
-					 1.0, -1.0,  1.0,
-
-
+				var vertices = cubeV().concat([
 					2.0,  0.0, -2.0,
 					-2.0,  0.0, -2.0,
 					-2.0, 0.0,  2.0,
@@ -306,46 +253,10 @@
 					2.0, 0.0,  2.0,
 					2.0, 0.0, -2.0,
 					-2.0, 0.0,  2.0,
-				];
+				]);
 				renderer.addBuffer(vertices,3,shaderProgram.aVertexPosition);
 
-				var normals = [
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-					0.0, 0.0, -1.0,
-
-
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-					0.0, 0.0,  1.0,
-
-
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-					-1.0, 0.0,  0.0,
-
-
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-					1.0, 0.0,  0.0,
-
-
+				var normals = cubeN().concat([
 					0.0, 1.0, 0.0,
 					0.0, 1.0, 0.0,
 					0.0, 1.0, 0.0,
@@ -353,63 +264,10 @@
 					0.0, 1.0, 0.0,
 					0.0, 1.0, 0.0,
 					0.0, 1.0, 0.0,
-
-
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-					0.0, -1.0, 0.0,
-
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-				];
+				]);
 				renderer.addBuffer(normals,3,shaderProgram.aVertexNormal);
 
-				var texmap = [
-					2.0, 0.0,
-					0.0, 0.0,
-					0.0,  2.0,
-
-					2.0, 2.0,
-					2.0, 0.0,
-					0.0,  2.0,
-
-
-					0.0, 0.0,
-					2.0, 0.0,
-					2.0,  2.0,
-
-					0.0, 2.0,
-					0.0, 0.0,
-					2.0,  2.0,
-
-
-					2.0,  0.0,
-					0.0,  0.0,
-					0.0,  2.0,
-
-					2.0,  2.0,
-					2.0,  0.0,
-					 0.0,  2.0,
-
-
-					 0.0,  0.0,
-					 2.0,  0.0,
-					  2.0,  2.0,
-
-					 0.0,  2.0,
-					 0.0,  0.0,
-					  2.0,  2.0,
-
-
+				var texmap = cubeT(2.0).concat([
 					2.0,  0.0,
 					0.0,  0.0,
 					0.0,   2.0,
@@ -417,88 +275,12 @@
 					2.0,   2.0,
 					2.0,  0.0,
 					0.0,  2.0,
-
-
-					0.0,   0.0,
-					2.0,   0.0,
-					2.0,  2.0,
-
-					0.0,   2.0,
-					0.0,   0.0,
-					 2.0,   2.0,
-
-					2.0,  0.0,
-					0.0,  0.0,
-					0.0,   2.0,
-
-					2.0,   2.0,
-					2.0,  0.0,
-					0.0,  2.0,
-				];
+				]);
 				renderer.addBuffer(texmap,2,shaderProgram.aVertexTexmap);
 
-				var tangents = [];
-				var binormals = [];
-				for ( var i=0; i<vertices.length; i+=9){
-					var v00 = vertices[i+0];
-					var v01 = vertices[i+1];
-					var v02 = vertices[i+2];
-					var v10 = vertices[i+3];
-					var v11 = vertices[i+4];
-					var v12 = vertices[i+5];
-					var v20 = vertices[i+6];
-					var v21 = vertices[i+7];
-					var v22 = vertices[i+8];
-
-					// Shortcuts for UVs
-					var uv00 = texmap[i/3*2+0];
-					var uv01 = texmap[i/3*2+1];
-					var uv10 = texmap[i/3*2+2];
-					var uv11 = texmap[i/3*2+3];
-					var uv20 = texmap[i/3*2+4];
-					var uv21 = texmap[i/3*2+5];
-
-					// Edges of the triangle : postion delta
-					var deltaPos10 = v10-v00;
-					var deltaPos11 = v11-v01;
-					var deltaPos12 = v12-v02;
-					var deltaPos20 = v20-v00;
-					var deltaPos21 = v21-v01;
-					var deltaPos22 = v22-v02;
-
-					// UV delta
-					var deltaUV10 = uv10-uv00;
-					var deltaUV11 = uv11-uv01;
-					var deltaUV20 = uv20-uv00;
-					var deltaUV21 = uv21-uv01;
-					var r = 1.0 / (deltaUV10 * deltaUV21 - deltaUV11 * deltaUV20);
-					var tangent0 = (deltaPos10 * deltaUV21   - deltaPos20 * deltaUV11)*r;
-					var tangent1 = (deltaPos11 * deltaUV21   - deltaPos21 * deltaUV11)*r;
-					var tangent2 = (deltaPos12 * deltaUV21   - deltaPos22 * deltaUV11)*r;
-					tangents.push(tangent0);
-					tangents.push(tangent1);
-					tangents.push(tangent2);
-					tangents.push(tangent0);
-					tangents.push(tangent1);
-					tangents.push(tangent2);
-					tangents.push(tangent0);
-					tangents.push(tangent1);
-					tangents.push(tangent2);
-					var binormal0 = (deltaPos20 * deltaUV10   - deltaPos10 * deltaUV20)*r;
-					var binormal1 = (deltaPos21 * deltaUV10   - deltaPos11 * deltaUV20)*r;
-					var binormal2 = (deltaPos22 * deltaUV10   - deltaPos12 * deltaUV20)*r;
-					binormals.push(binormal0);
-					binormals.push(binormal1);
-					binormals.push(binormal2);
-					binormals.push(binormal0);
-					binormals.push(binormal1);
-					binormals.push(binormal2);
-					binormals.push(binormal0);
-					binormals.push(binormal1);
-					binormals.push(binormal2);
-				}
-				renderer.addBuffer(tangents,3,shaderProgram.aVertexTangent);
-				renderer.addBuffer(binormals,3,shaderProgram.aVertexBinormal);
+				var buf = generateTangent(vertices, texmap);
+				renderer.addBuffer(buf.tangents,3,shaderProgram.aVertexTangent);
+				renderer.addBuffer(buf.binormals,3,shaderProgram.aVertexBinormal);
 			}
 
 			var gl;

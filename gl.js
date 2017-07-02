@@ -8,8 +8,7 @@ function initGL(canvas) {
 		gl.viewportHeight = canvas.height;
 		gl.drawBuffersExt = gl.getExtension('WEBGL_draw_buffers');
 		gl.floatExt = gl.getExtension('OES_texture_half_float');
-	} catch (e) {
-	}
+	} catch (e) {}
 	if (!gl) {
 		alert("Could not initialise WebGL, sorry :-(");
 	} else if (!gl.drawBuffersExt) {
@@ -26,7 +25,11 @@ function loadImage(url) {
 	return image;
 }
 
-var TextureFlags = {FILTER : 1 << 0, DEPTH : 1 << 1, FLOAT : 1 << 2};
+var TextureFlags = {
+	FILTER: 1 << 0,
+	DEPTH: 1 << 1,
+	FLOAT: 1 << 2
+};
 
 function Texture(image, gl, flags = 0, width = undefined, height = undefined) {
 	this.gl = gl;
@@ -60,18 +63,18 @@ function Texture(image, gl, flags = 0, width = undefined, height = undefined) {
 		}
 		if (image === null)
 			gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, format,
-			              type, null);
+				type, null);
 		else
 			gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, format, type, image);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER,
-		                 filter ? gl.LINEAR : gl.NEAREST);
+			filter ? gl.LINEAR : gl.NEAREST);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER,
-		                 filter ? gl.LINEAR_MIPMAP_NEAREST : gl.NEAREST);
+			filter ? gl.LINEAR_MIPMAP_NEAREST : gl.NEAREST);
 		var ext = (gl.getExtension('EXT_texture_filter_anisotropic') ||
-		           gl.getExtension('MOZ_EXT_texture_filter_anisotropic') ||
-		           gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic'));
+			gl.getExtension('MOZ_EXT_texture_filter_anisotropic') ||
+			gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic'));
 		if (ext && filter) {
 			var max = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
 			gl.texParameterf(gl.TEXTURE_2D, ext.TEXTURE_MAX_ANISOTROPY_EXT, max);
@@ -85,10 +88,13 @@ function Texture(image, gl, flags = 0, width = undefined, height = undefined) {
 	else
 		onload();
 }
-Texture.prototype.bind = function() {
+Texture.prototype.bind = function(channel) {
+	this.channel = channel;
+	this.gl.activeTexture(this.gl.TEXTURE0 + channel);
 	this.gl.bindTexture(this.gl.TEXTURE_2D, this.id);
 };
 Texture.prototype.unbind = function() {
+	this.gl.activeTexture(this.channel);
 	this.gl.bindTexture(this.gl.TEXTURE_2D, null);
 };
 
@@ -113,17 +119,15 @@ Renderer.prototype.addBuffer = function(data, itemSize, attribute) {
 Renderer.prototype.draw = function() {
 	var gl = this.gl;
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	for (var i = 0; i < this.textures.length; i++) {
-		gl.activeTexture(gl.TEXTURE0 + i);
-		this.textures[i].bind();
-	}
+	for (var i = 0; i < this.textures.length; i++)
+		this.textures[i].bind(i);
 	for (var i = 0; i < this.buffers.length; i++) {
 		if (this.buffers[i].attribute < 0)
 			continue;
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers[i]);
 		gl.enableVertexAttribArray(this.buffers[i].attribute);
 		gl.vertexAttribPointer(this.buffers[i].attribute, this.buffers[i].itemSize,
-		                       gl.FLOAT, false, 0, 0);
+			gl.FLOAT, false, 0, 0);
 	}
 	gl.drawArrays(gl.TRIANGLES, 0, this.buffers[0].numItems);
 	for (var i = 0; i < this.buffers.length; i++) {
@@ -131,10 +135,8 @@ Renderer.prototype.draw = function() {
 			continue;
 		gl.disableVertexAttribArray(this.buffers[i].attribute);
 	}
-	for (var i = 0; i < this.textures.length; i++) {
-		gl.activeTexture(gl.TEXTURE0 + i);
+	for (var i = 0; i < this.textures.length; i++)
 		this.textures[i].unbind();
-	}
 };
 
 function ShaderProgram(name, gl, setUniforms = function(shaderProgram) {}) {
@@ -177,7 +179,7 @@ function ShaderProgram(name, gl, setUniforms = function(shaderProgram) {}) {
 	gl.attachShader(this.id, fragmentShader);
 	gl.linkProgram(this.id);
 	if (!gl.getProgramParameter(this.id, gl.LINK_STATUS)) {
-		alert("Could not initialise shader "+name);
+		alert("Could not initialise shader " + name);
 	}
 };
 ShaderProgram.prototype.bind = function() {
@@ -218,13 +220,14 @@ RenderBuffer.prototype.unbind = function() {
 };
 
 var colorAttachmentBuffer = {};
+
 function getColorAttachmentList(gl, count) {
 	if (colorAttachmentBuffer[count])
 		return colorAttachmentBuffer[count];
 	colorAttachmentBuffer[count] = [];
 	for (var i = 0; i < count; i++) {
 		colorAttachmentBuffer[count].push(gl.drawBuffersExt.COLOR_ATTACHMENT0_WEBGL +
-		                                  i);
+			i);
 	}
 	return colorAttachmentBuffer[count];
 }
@@ -237,15 +240,15 @@ function FrameBuffer(gl) {
 };
 FrameBuffer.prototype.bind = function() {
 	if (this.gl.checkFramebufferStatus(this.gl.FRAMEBUFFER) !==
-	    this.gl.FRAMEBUFFER_COMPLETE) {
+		this.gl.FRAMEBUFFER_COMPLETE) {
 		alert("Could not create FBO, sorry :-(");
 	}
 	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.id);
 	if (this.colorTargets.length > 0)
 		this.gl.viewport(0, 0, this.colorTargets[0].width,
-		                 this.colorTargets[0].height);
+			this.colorTargets[0].height);
 	this.gl.drawBuffersExt.drawBuffersWEBGL(
-	    getColorAttachmentList(this.gl, this.colorTargets.length));
+		getColorAttachmentList(this.gl, this.colorTargets.length));
 	if (this.depthTarget)
 		this.gl.enable(this.gl.DEPTH_TEST);
 	else
@@ -260,13 +263,13 @@ FrameBuffer.prototype.addTarget = function(texture) {
 	this.bind();
 	if (!texture.depth) {
 		this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER,
-		                             this.gl.drawBuffersExt.COLOR_ATTACHMENT0_WEBGL +
-		                                 this.colorTargets.length,
-		                             this.gl.TEXTURE_2D, texture.id, 0);
+			this.gl.drawBuffersExt.COLOR_ATTACHMENT0_WEBGL +
+			this.colorTargets.length,
+			this.gl.TEXTURE_2D, texture.id, 0);
 		this.colorTargets.push(texture);
 	} else {
 		this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.DEPTH_ATTACHMENT,
-		                             this.gl.TEXTURE_2D, texture.id, 0);
+			this.gl.TEXTURE_2D, texture.id, 0);
 		this.depthTarget = texture;
 	}
 	this.unbind();
@@ -275,20 +278,20 @@ FrameBuffer.prototype.addRenderbuffer = function(buffer) {
 	this.bind();
 	if (!buffer.depth) {
 		this.gl.framebufferRenderbuffer(
-		    this.gl.FRAMEBUFFER,
-		    this.gl.drawBuffersExt.COLOR_ATTACHMENT0_WEBGL + this.colorTargets.length,
-		    this.gl.RENDERBUFFER, buffer.id);
+			this.gl.FRAMEBUFFER,
+			this.gl.drawBuffersExt.COLOR_ATTACHMENT0_WEBGL + this.colorTargets.length,
+			this.gl.RENDERBUFFER, buffer.id);
 		this.colorTargets.push(buffer);
 	} else {
 		this.gl.framebufferRenderbuffer(this.gl.FRAMEBUFFER, this.gl.DEPTH_ATTACHMENT,
-		                                this.gl.RENDERBUFFER, buffer.id);
+			this.gl.RENDERBUFFER, buffer.id);
 		this.depthTarget = buffer;
 	}
 	this.unbind();
 };
 
 function Filter(textures, shaderName, gl,
-                setUnifroms = function(shaderProgram) {}) {
+	setUnifroms = function(shaderProgram) {}) {
 	this.gl = gl;
 	this.textures = textures;
 	this.shader = new ShaderProgram(shaderName, gl, setUnifroms);
@@ -299,21 +302,16 @@ function Filter(textures, shaderName, gl,
 	this.renderer = new Renderer(gl);
 	for (var i in textures)
 		this.renderer.addTexture(textures[i]);
-	var vertices = [
-		-1.0,
-		-1.0,
+	var vertices = [-1.0, -1.0,
 		1.0,
 
-		-1.0,
-		-1.0,
+		-1.0, -1.0,
 		1.0,
 
-		1.0,
-		-1.0,
+		1.0, -1.0,
 		1.0,
 
-		1.0,
-		-1.0,
+		1.0, -1.0,
 		1.0,
 	];
 	this.renderer.addBuffer(vertices, 2, this.shader.aVertexPosition);
@@ -342,7 +340,7 @@ Filter.prototype.draw = function() {
 };
 
 function TextureFilter(width, height, textures, shaderName, gl,
-                setUnifroms = function(shaderProgram) {}){
+	setUnifroms = function(shaderProgram) {}) {
 	Filter.apply(this, [textures, shaderName, gl, setUnifroms]);
 	this.fbo = new FrameBuffer(gl);
 	this.output = new Texture(null, gl, 0, width, height);
@@ -352,6 +350,6 @@ TextureFilter.prototype = Object.create(Filter.prototype);
 TextureFilter.prototype.constructor = TextureFilter;
 TextureFilter.prototype.draw = function() {
 	this.fbo.bind();
-	Filter.prototype.draw.apply(this,[]);
+	Filter.prototype.draw.apply(this, []);
 	this.fbo.unbind();
 };
