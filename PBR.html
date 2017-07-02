@@ -62,7 +62,7 @@
 				vec3 v = normalize(w0);
 				vec3 l = normalize(w1);
 				vec3 h = normalize(v + l);
-				float denom = 4.0 * max(dot(n, w0), 0.0) * max(dot(n, w1), 0.0) + 0.0001;
+				float denom = max(4.0 * dot(n, w0) * dot(n, w1), 0.0);
 				return F(f0, h, v) * G(n, v, l, a) * NDF(n, h, a) / denom;
 			}
 
@@ -86,9 +86,10 @@
 			}
 
 			vec3 env(vec4 color, float maxbr) {
+				const float factor = 1000.0;
 				color.rgb = pow(color.rgb, vec3(2.2));
-				color.a *=  log(maxbr * 1000.0 + 1.0);
-				color.a = (exp(color.a) - 1.0) / 1000.0;
+				color.a *=  log(maxbr * factor + 1.0);
+				color.a = (exp(color.a) - 1.0) / factor;
 				return color.rgb * color.a;
 			}
 
@@ -105,11 +106,12 @@
 					roughness = texture2D(roughnessTexture, texmap).r;
 					metallic = texture2D(metallicTexture, texmap).r;
 				}
-				vec3 color = cookTorranceBRDF(albedo, ambient, roughness, metallic, vec3(frontLight), N, -position, vec3(0.0,0.0,1.0)) +
+				vec3 color = cookTorranceBRDF(albedo, ambient, roughness, metallic, vec3(frontLight), N, -position, vec3(0.0,0.0,1.0));// +
 				// cookTorranceBRDF(albedo, ambient, roughness, metallic, vec3(0.0,0.0,7.0), N, -position, vec3(2.0,2.0,-2.0)) +
-				cookTorranceBRDF(albedo, ambient, roughness, metallic, spectacular, N, -position, ray);
+				//cookTorranceBRDF(albedo, ambient, roughness, metallic, spectacular, N, -position, ray);
+				// color = env(texture2D(specmap, texmap), 287.0);
 				color = color / (color + vec3(1.0));
-				color=pow(color,vec3(1.0/2.2));
+				color = pow(color,vec3(1.0/2.2));
 				gl_FragColor = vec4(color, 1.0);
 				// gl_FragData[1] = vec4(position, 1.0);
 				// gl_FragData[2] = vec4(normal, 1.01);
