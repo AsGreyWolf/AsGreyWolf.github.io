@@ -12,6 +12,62 @@
 		<script type="text/javascript" src="gl.js"></script>
 		<script type="text/javascript" src="models.js"></script>
 
+		<script id="shaderCube-fs" type="x-shader/x-fragment">
+			// #extension GL_EXT_draw_buffers : require
+			precision highp float;
+			precision lowp sampler2D;
+			varying vec3 position;
+			uniform sampler2D envmap;
+			uniform sampler2D specmap;
+
+			const float PI = 3.14159265359;
+
+			vec2 project(vec3 pos) {
+				vec2 result = vec2(atan(pos.z, pos.x) / 6.28318530718, asin(pos.y) / 3.14159265359);
+				result += 0.5;
+				return result;
+			}
+
+			vec3 env(vec4 color, float maxbr) {
+				const float factor = 1000.0;
+				color.rgb = pow(color.rgb, vec3(2.2));
+				color.a *=  log(maxbr * factor + 1.0);
+				color.a = (exp(color.a) - 1.0) / factor;
+				return color.rgb * color.a;
+			}
+
+			void main(void) {
+				vec3 color = env(texture2D(specmap, project(normalize(position))), 30.0);
+				color = color / (color + vec3(1.0));
+				color = pow(color,vec3(1.0/2.2));
+				gl_FragColor = vec4(color, 1.0);
+			}
+		</script>
+		<script id="shaderCube-vs" type="x-shader/x-vertex">
+			attribute vec3 aVertexPosition;
+			uniform mat4 uMVMatrix;
+			uniform mat4 uNMVMatrix;
+			uniform mat4 uPMatrix;
+			varying vec3 position;
+			mat4 transpose4(in mat4 inMatrix) {
+				vec4 i0 = inMatrix[0];
+				vec4 i1 = inMatrix[1];
+				vec4 i2 = inMatrix[2];
+				vec4 i3 = inMatrix[3];
+
+				return mat4(
+							 vec4(i0.x, i1.x, i2.x, i3.x),
+							 vec4(i0.y, i1.y, i2.y, i3.y),
+							 vec4(i0.z, i1.z, i2.z, i3.z),
+							 vec4(i0.w, i1.w, i2.w, i3.w)
+							 );
+			}
+			void main(void) {
+				vec4 camera = transpose4(uNMVMatrix) * vec4(0.0, 0.0, 0.0, 1.0);
+				position = aVertexPosition - camera.xyz / camera.w;
+				gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+			}
+		</script>
 		<script id="shader3d-fs" type="x-shader/x-fragment">
 			// #extension GL_EXT_draw_buffers : require
 			precision highp float;
@@ -34,7 +90,7 @@
 			const float PI = 3.14159265359;
 
 			vec3 F(vec3 f0, vec3 h, vec3 v){
-				return f0 + (1.0 - f0) * pow(1.0 - max(dot(h,v), 0.0), 5.0);
+				return f0 + (1.0 - f0) * pow(1.0 - max(dot(h, v), 0.0), 5.0);
 			}
 
 			float kFactor(float a){
@@ -62,7 +118,7 @@
 				vec3 v = normalize(w0);
 				vec3 l = normalize(w1);
 				vec3 h = normalize(v + l);
-				float denom = max(4.0 * dot(n, w0) * dot(n, w1), 0.0);
+				float denom = max(4.0 * dot(n, w0) * dot(n, w1), 0.0001);
 				return F(f0, h, v) * G(n, v, l, a) * NDF(n, h, a) / denom;
 			}
 
@@ -143,43 +199,50 @@
 
 				return outMatrix;
 			}
+			mat4 transpose4(in mat4 inMatrix) {
+				vec4 i0 = inMatrix[0];
+				vec4 i1 = inMatrix[1];
+				vec4 i2 = inMatrix[2];
+				vec4 i3 = inMatrix[3];
+
+				return mat4(
+							 vec4(i0.x, i1.x, i2.x, i3.x),
+							 vec4(i0.y, i1.y, i2.y, i3.y),
+							 vec4(i0.z, i1.z, i2.z, i3.z),
+							 vec4(i0.w, i1.w, i2.w, i3.w)
+							 );
+			}
 			void main(void) {
 				texmap = aVertexTexmap * 2.0;
-				vec3 norm=(uNMVMatrix* vec4(aVertexNormal, 1.0)).xyz;
-				// vec3 tangent=normalize((uNMVMatrix* vec4(aVertexTangent, 1.0)).xyz);
-				// vec3 binorm=normalize((uNMVMatrix* vec4(aVertexBinormal, 1.0)).xyz);
-				// mat3 TBN = transpose(mat3(
-				// 	tangent,
-				// 	binorm,
-				// 	norm
-				// ));
-				vec4 position4 = uMVMatrix * vec4(aVertexPosition, 1.0);
-				position = position4.xyz;
-				normal = norm;
-				gl_Position = uPMatrix * position4;
+				// vec3 norm=(uNMVMatrix* vec4(aVertexNormal, 1.0)).xyz;
+				vec4 camera = transpose4(uNMVMatrix) * vec4(0.0, 0.0, 0.0, 1.0);
+				position = aVertexPosition - camera.xyz / camera.w;
+				normal = aVertexNormal;
+				gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
 			}
 		</script>
 		<script type="text/javascript">
 			"use strict";
 			function initBuffers() {
-				var vertices = sphereV().concat([
-					2.0,  0.0, -2.0,
-					-2.0,  0.0, -2.0,
-					-2.0, 0.0,  2.0,
-
-					2.0, 0.0,  2.0,
-					2.0, 0.0, -2.0,
-					-2.0, 0.0,  2.0,
-
-
-					-1.0,  1.0, 1.0,
-					1.0,  1.0, 1.0,
-					-1.0, 0.0,  2.0,
-
-					1.0, 1.0, 1.0,
-					1.0, 0.0, 2.0,
-					-1.0, 0.0, 2.0,
-				])
+				var vertices = sphereV();
+				// .concat([
+				// 	2.0,  0.0, -2.0,
+				// 	-2.0,  0.0, -2.0,
+				// 	-2.0, 0.0,  2.0,
+				//
+				// 	2.0, 0.0,  2.0,
+				// 	2.0, 0.0, -2.0,
+				// 	-2.0, 0.0,  2.0,
+				//
+				//
+				// 	-1.0,  1.0, 1.0,
+				// 	1.0,  1.0, 1.0,
+				// 	-1.0, 0.0,  2.0,
+				//
+				// 	1.0, 1.0, 1.0,
+				// 	1.0, 0.0, 2.0,
+				// 	-1.0, 0.0, 2.0,
+				// ])
 				var v2 = sphereV(0.1);
 				for(var i=0; i<v2.length; i+=3){
 					v2[i+1]+=0.5;
@@ -191,58 +254,71 @@
 				}
 				renderer3d.addBuffer(vertices,3,shader3d.aVertexPosition);
 
-				var normals = sphereN().concat([
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-					0.0, 1.0, 0.0,
-
-
-					0.0, -1.0, -1.0,
-					0.0, -1.0, -1.0,
-					0.0, -1.0, -1.0,
-
-					0.0, -1.0, -1.0,
-					0.0, -1.0, -1.0,
-					0.0, -1.0, -1.0,
-				]).concat(sphereN());
+				var normals = sphereN();
+				// .concat([
+				// 	0.0, 1.0, 0.0,
+				// 	0.0, 1.0, 0.0,
+				// 	0.0, 1.0, 0.0,
+				//
+				// 	0.0, 1.0, 0.0,
+				// 	0.0, 1.0, 0.0,
+				// 	0.0, 1.0, 0.0,
+				//
+				//
+				// 	0.0, -1.0, -1.0,
+				// 	0.0, -1.0, -1.0,
+				// 	0.0, -1.0, -1.0,
+				//
+				// 	0.0, -1.0, -1.0,
+				// 	0.0, -1.0, -1.0,
+				// 	0.0, -1.0, -1.0,
+				// ])
+				normals = normals.concat(sphereN());
 				renderer3d.addBuffer(normals,3,shader3d.aVertexNormal);
 
-				var texmap = sphereT().concat([
-					2.0,  0.0,
-					0.0,  0.0,
-					0.0,   2.0,
-
-					2.0,   2.0,
-					2.0,  0.0,
-					0.0,  2.0,
-
-
-					0.0,  0.0,
-					2.0,  0.0,
-					0.0,   2.0,
-
-					2.0,  0.0,
-					2.0,   2.0,
-					0.0,  2.0,
-				]).concat(sphereT());
+				var texmap = sphereT();
+				// .concat([
+				// 	2.0,  0.0,
+				// 	0.0,  0.0,
+				// 	0.0,   2.0,
+				//
+				// 	2.0,   2.0,
+				// 	2.0,  0.0,
+				// 	0.0,  2.0,
+				//
+				//
+				// 	0.0,  0.0,
+				// 	2.0,  0.0,
+				// 	0.0,   2.0,
+				//
+				// 	2.0,  0.0,
+				// 	2.0,   2.0,
+				// 	0.0,  2.0,
+				// ])
+				texmap = texmap.concat(sphereT());
 				renderer3d.addBuffer(texmap,2,shader3d.aVertexTexmap);
 
 				var buf = generateTangent(vertices, texmap);
 				renderer3d.addBuffer(buf.tangents, 3, shader3d.aVertexTangent);
 				renderer3d.addBuffer(buf.binormals, 3, shader3d.aVertexBinormal);
+
+				buf = cubeV(20.0);
+				flip(buf);
+				rendererCube.addBuffer(buf, 3, shaderCube.aVertexPosition);
 			}
 
 			var gl;
 			var renderer3d;
 			var shader3d;
+			var rendererCube;
+			var shaderCube;
 			function tick(){
 				requestAnimFrame(tick);
+				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 				shader3d.bind();
 				renderer3d.draw();
+				shaderCube.bind();
+				rendererCube.draw();
 			}
 
 			var angleX=0.0;
@@ -282,20 +358,19 @@
 				gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 				gl.enable(gl.CULL_FACE);
 				gl.enable(gl.DEPTH_TEST);
+				var matrices = {mvMatrix: mat4.create(), nmvMatrix: mat4.create(), pMatrix: mat4.create()};
 				shader3d = new ShaderProgram("shader3d",gl, function(shaderProgram){
-					var pMatrix = mat4.create();
-					mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
-					gl.uniformMatrix4fv(shaderProgram.uPMatrix, false, pMatrix);
-					var mvMatrix = mat4.create();
-					mat4.identity(mvMatrix);
-					mat4.translate(mvMatrix, [0.0,  0.0,-3.0]);
-					mat4.rotateX(mvMatrix, -1.57079632679+angleY);
-					mat4.rotateZ(mvMatrix, angleX+3.14);
-					gl.uniformMatrix4fv(shaderProgram.uMVMatrix, false, mvMatrix);
-					var nmvMatrix=mvMatrix;
-					mat4.inverse(nmvMatrix);
-					mat4.transpose(nmvMatrix);
-					gl.uniformMatrix4fv(shaderProgram.uNMVMatrix, false, nmvMatrix);
+					mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, matrices.pMatrix);
+					gl.uniformMatrix4fv(shaderProgram.uPMatrix, false, matrices.pMatrix);
+					mat4.identity(matrices.mvMatrix);
+					mat4.translate(matrices.mvMatrix, [0.0,  0.0,-3.0]);
+					mat4.rotateX(matrices.mvMatrix, angleY); //-1.57079632679+
+					mat4.rotateY(matrices.mvMatrix, angleX); //+3.14
+					gl.uniformMatrix4fv(shaderProgram.uMVMatrix, false, matrices.mvMatrix);
+					matrices.nmvMatrix = mat4.create(matrices.mvMatrix);
+					mat4.inverse(matrices.nmvMatrix);
+					mat4.transpose(matrices.nmvMatrix);
+					gl.uniformMatrix4fv(shaderProgram.uNMVMatrix, false, matrices.nmvMatrix);
 
 					gl.uniform3f(shaderProgram.albedoU, albedoU.jscolor.rgb[0]/255.0, albedoU.jscolor.rgb[1]/255.0, albedoU.jscolor.rgb[2]/255.0);
 					gl.uniform1f(shaderProgram.metallicU, metallicU.value/100.0);
@@ -322,12 +397,29 @@
 				shader3d.addTextureUniform("envmap");
 				shader3d.addTextureUniform("specmap");
 
+				var envmap = new Texture(loadImage("textures/env.png"), gl, TextureFlags.FILTER | TextureFlags.CLAMP_TO_EDGE);
+				var reflmap = new Texture(loadImage("textures/refl.png"), gl, TextureFlags.FILTER | TextureFlags.CLAMP_TO_EDGE);
 				renderer3d = new Renderer(gl);
 				renderer3d.addTexture(new Texture(loadImage("textures/rustediron2_basecolor.png"), gl, TextureFlags.FILTER));
 				renderer3d.addTexture(new Texture(loadImage("textures/rustediron2_roughness.png"), gl, TextureFlags.FILTER));
 				renderer3d.addTexture(new Texture(loadImage("textures/rustediron2_metallic.png"), gl, TextureFlags.FILTER));
-				renderer3d.addTexture(new Texture(loadImage("textures/env.png"), gl, TextureFlags.FILTER));
-				renderer3d.addTexture(new Texture(loadImage("textures/refl.png"), gl, TextureFlags.FILTER));
+				renderer3d.addTexture(envmap);
+				renderer3d.addTexture(reflmap);
+
+				shaderCube = new ShaderProgram("shaderCube", gl, function(shaderProgram){
+					gl.uniformMatrix4fv(shaderProgram.uPMatrix, false, matrices.pMatrix);
+					gl.uniformMatrix4fv(shaderProgram.uMVMatrix, false, matrices.mvMatrix);
+					gl.uniformMatrix4fv(shaderProgram.uNMVMatrix, false, matrices.nmvMatrix);
+				});
+				shaderCube.addAttribute("aVertexPosition");
+				shaderCube.addUniform("uPMatrix");
+				shaderCube.addUniform("uMVMatrix");
+				shaderCube.addUniform("uNMVMatrix");
+				shaderCube.addTextureUniform("envmap");
+				shaderCube.addTextureUniform("specmap");
+				rendererCube = new Renderer(gl);
+				rendererCube.addTexture(envmap);
+				rendererCube.addTexture(reflmap);
 
 				initBuffers();
 

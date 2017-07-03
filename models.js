@@ -349,3 +349,17 @@ function generateTangent(vertices, texmap) {
 		binormals: binormals
 	};
 }
+
+function flip(positions) {
+	for(var i = 0; i<positions.length; i+=9) {
+		var b0 = positions[i+3];
+		var b1 = positions[i+4];
+		var b2 = positions[i+5];
+		positions[i+3] = positions[i+6];
+		positions[i+4] = positions[i+7];
+		positions[i+5] = positions[i+8];
+		positions[i+6] = b0;
+		positions[i+7] = b1;
+		positions[i+8] = b2;
+	}
+}

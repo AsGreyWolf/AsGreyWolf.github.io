@@ -28,7 +28,8 @@ function loadImage(url) {
 var TextureFlags = {
 	FILTER: 1 << 0,
 	DEPTH: 1 << 1,
-	FLOAT: 1 << 2
+	FLOAT: 1 << 2,
+	CLAMP_TO_EDGE: 1 << 3
 };
 
 function Texture(image, gl, flags = 0, width = undefined, height = undefined) {
@@ -66,8 +67,8 @@ function Texture(image, gl, flags = 0, width = undefined, height = undefined) {
 				type, null);
 		else
 			gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, format, type, image);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, (flags & TextureFlags.CLAMP_TO_EDGE) === 0 ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, (flags & TextureFlags.CLAMP_TO_EDGE) === 0 ? gl.REPEAT : gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER,
 			filter ? gl.LINEAR : gl.NEAREST);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER,
@@ -94,8 +95,10 @@ Texture.prototype.bind = function(channel) {
 	this.gl.bindTexture(this.gl.TEXTURE_2D, this.id);
 };
 Texture.prototype.unbind = function() {
-	this.gl.activeTexture(this.channel);
+	if (this.channel)
+		this.gl.activeTexture(this.gl.TEXTURE0 + this.channel);
 	this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+	this.channel = undefined;
 };
 
 function Renderer(gl) {
@@ -118,7 +121,6 @@ Renderer.prototype.addBuffer = function(data, itemSize, attribute) {
 };
 Renderer.prototype.draw = function() {
 	var gl = this.gl;
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	for (var i = 0; i < this.textures.length; i++)
 		this.textures[i].bind(i);
 	for (var i = 0; i < this.buffers.length; i++) {
@@ -253,6 +255,7 @@ FrameBuffer.prototype.bind = function() {
 		this.gl.enable(this.gl.DEPTH_TEST);
 	else
 		this.gl.disable(this.gl.DEPTH_TEST);
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 };
 FrameBuffer.prototype.unbind = function() {
 	this.gl.disable(this.gl.DEPTH_TEST);
