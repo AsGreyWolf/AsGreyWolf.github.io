@@ -86,6 +86,7 @@
 
 			uniform sampler2D envmap;
 			uniform sampler2D specmap;
+			uniform sampler2D lutmap;
 
 			const float PI = 3.14159265359;
 
@@ -122,7 +123,7 @@
 				return F(f0, h, v) * G(n, v, l, a) * NDF(n, h, a) / denom;
 			}
 
-			vec3 cookTorranceBRDF(vec3 albedo, vec3 ambient, float a, float metallic, vec3 light, vec3 n, vec3 w0, vec3 w1) {
+			vec3 cookTorranceBRDF(vec3 albedo, vec3 ambient, vec3 spectacular, float a, float metallic, vec3 light, vec3 n, vec3 w0, vec3 w1) {
 				vec3 v = normalize(w0);
 				vec3 l = normalize(w1);
 				vec3 h = normalize(v + l);
@@ -132,7 +133,11 @@
 				// Ks = vec3(1.0);
 				vec3 Kd = 1.0 - Ks;
 				Kd *= 1.0 - metallic;
-				return (Kd * albedo / PI + Ks * cookTorranceSpec(n, w0, w1, a, f0)) * max(dot(n, l),0.0) * light + Kd * albedo * ambient / 3.14159;
+				vec3 lighting = (Kd * albedo / PI + Ks * cookTorranceSpec(n, w0, w1, a, f0)) * max(dot(n, l),0.0) * light;
+				vec3 irr = Kd * albedo / PI * ambient;
+				vec2 envBRDF  = texture2D(lutmap, vec2(max(dot(n, v), 0.0), a)).rg;
+				vec3 refl = spectacular * (Ks * envBRDF.x + envBRDF.y);
+				return  lighting + irr + refl;
 			}
 
 			vec2 project(vec3 pos) {
@@ -162,7 +167,7 @@
 					roughness = texture2D(roughnessTexture, texmap).r;
 					metallic = texture2D(metallicTexture, texmap).r;
 				}
-				vec3 color = cookTorranceBRDF(albedo, ambient, roughness, metallic, vec3(frontLight), N, -position, vec3(0.0,0.0,1.0));// +
+				vec3 color = cookTorranceBRDF(albedo, ambient, spectacular, roughness, metallic, vec3(frontLight), N, -position, vec3(0.0,0.0,1.0));// +
 				// cookTorranceBRDF(albedo, ambient, roughness, metallic, vec3(0.0,0.0,7.0), N, -position, vec3(2.0,2.0,-2.0)) +
 				//cookTorranceBRDF(albedo, ambient, roughness, metallic, spectacular, N, -position, ray);
 				// color = env(texture2D(specmap, texmap), 287.0);
@@ -396,6 +401,7 @@
 				shader3d.addTextureUniform("metallicTexture");
 				shader3d.addTextureUniform("envmap");
 				shader3d.addTextureUniform("specmap");
+				shader3d.addTextureUniform("lutmap");
 
 				var envmap = new Texture(loadImage("textures/env.png"), gl, TextureFlags.FILTER | TextureFlags.CLAMP_TO_EDGE);
 				var reflmap = new Texture(loadImage("textures/refl.png"), gl, TextureFlags.FILTER | TextureFlags.CLAMP_TO_EDGE);
@@ -405,6 +411,7 @@
 				renderer3d.addTexture(new Texture(loadImage("textures/rustediron2_metallic.png"), gl, TextureFlags.FILTER));
 				renderer3d.addTexture(envmap);
 				renderer3d.addTexture(reflmap);
+				renderer3d.addTexture(new Texture(loadImage("textures/ibl_brdf_lut.png"), gl, TextureFlags.FILTER | TextureFlags.CLAMP_TO_EDGE));
 
 				shaderCube = new ShaderProgram("shaderCube", gl, function(shaderProgram){
 					gl.uniformMatrix4fv(shaderProgram.uPMatrix, false, matrices.pMatrix);
