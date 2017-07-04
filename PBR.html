@@ -137,7 +137,7 @@
 				vec3 irr = Kd * albedo / PI * ambient;
 				vec2 envBRDF  = texture2D(lutmap, vec2(max(dot(n, v), 0.0), a)).rg;
 				vec3 refl = spectacular * (Ks * envBRDF.x + envBRDF.y);
-				return  lighting + irr + refl;
+				return lighting + irr + refl;
 			}
 
 			vec2 project(vec3 pos) {

@@ -70,9 +70,9 @@ function Texture(image, gl, flags = 0, width = undefined, height = undefined) {
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, (flags & TextureFlags.CLAMP_TO_EDGE) === 0 ? gl.REPEAT : gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, (flags & TextureFlags.CLAMP_TO_EDGE) === 0 ? gl.REPEAT : gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER,
-			filter ? gl.LINEAR : gl.NEAREST);
+			filter ? gl.LINEAR_MIPMAP_LINEAR : gl.NEAREST);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER,
-			filter ? gl.LINEAR_MIPMAP_NEAREST : gl.NEAREST);
+			filter ? gl.LINEAR_MIPMAP_LINEAR : gl.NEAREST);
 		var ext = (gl.getExtension('EXT_texture_filter_anisotropic') ||
 			gl.getExtension('MOZ_EXT_texture_filter_anisotropic') ||
 			gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic'));
