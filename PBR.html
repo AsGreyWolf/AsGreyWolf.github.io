@@ -132,7 +132,7 @@
 				// Ks = vec3(1.0);
 				vec3 Kd = 1.0 - Ks;
 				Kd *= 1.0 - metallic;
-				return (Kd * albedo / PI + Ks * cookTorranceSpec(n, w0, w1, a, f0)) * max(dot(n, l),0.0) * light + Kd * albedo * ambient;
+				return (Kd * albedo / PI + Ks * cookTorranceSpec(n, w0, w1, a, f0)) * max(dot(n, l),0.0) * light + Kd * albedo * ambient / 3.14159;
 			}
 
 			vec2 project(vec3 pos) {
