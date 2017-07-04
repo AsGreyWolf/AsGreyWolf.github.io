@@ -1,7 +1,7 @@
 import imageio
 import numpy as np
 
-image = np.array(imageio.imread('env.exr'))
+image = np.array(imageio.imread('output1.exr'))
 image = image ** 2.2
 brightness = 0.2126 * image[..., 0] + \
              0.7152 * image[..., 1] + \
@@ -11,7 +11,7 @@ image[..., 1] /= brightness
 image[..., 2] /= brightness
 print('mean %s' % np.mean(brightness))
 print(np.mean(brightness) + 3*(np.var(brightness)**0.5))
-maxbr = 30
+maxbr = 5
 factor = 1000
 brightness = np.log(brightness * factor + 1) / np.log(maxbr * factor + 1)
 w, h, dims = image.shape
