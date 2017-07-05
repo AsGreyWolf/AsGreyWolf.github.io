@@ -127,7 +127,7 @@
 				return F(f0, h, v) * G(n, v, l, a) * NDF(n, h, a) / denom;
 			}
 
-			vec3 cookTorranceBRDF(vec3 albedo, float a, float metallic, vec3 light, vec3 n, vec3 w0, vec3 w1) {
+			vec3 cookTorranceBRDF(vec3 albedo, float a, float metallic, vec3 n, vec3 w0, vec3 w1) {
 				vec3 v = normalize(w0);
 				vec3 l = normalize(w1);
 				vec3 h = normalize(v + l);
@@ -136,21 +136,8 @@
 				vec3 Ks = F(f0, h, v);
 				vec3 Kd = 1.0 - Ks;
 				Kd *= 1.0 - metallic;
-				vec3 lighting = (Kd * albedo / PI + Ks * cookTorranceSpec(n, w0, w1, a, f0)) * max(dot(n, l),0.0) * light;
+				vec3 lighting = (Kd * albedo / PI + Ks * cookTorranceSpec(n, w0, w1, a, f0)) * max(dot(n, l),0.0);
 				return lighting;
-			}
-
-			vec3 cookTorranceEnvMapping(vec3 albedo, vec3 ambient, vec3 spectacular, float a, float metallic, vec3 n, vec3 w0) {
-				vec3 v = normalize(w0);
-				vec3 f0 = vec3(0.04);
-				f0      = mix(f0, albedo, metallic);
-				vec3 Ks = Fr(f0, n, v, a);
-				vec3 Kd = 1.0 - Ks;
-				Kd *= 1.0 - metallic;
-				vec3 irr = Kd * albedo * PI * ambient;
-				vec2 envBRDF  = texture2D(lutmap, vec2(max(dot(n, v), 0.0), a)).rg;
-				vec3 refl = spectacular * (Ks * envBRDF.x + envBRDF.y);
-				return refl + irr;
 			}
 
 			vec2 project(vec3 pos) {
@@ -167,6 +154,20 @@
 				return color.rgb * color.a;
 			}
 
+			vec3 cookTorranceEnvMapping(vec3 albedo, float a, float metallic, vec3 n, vec3 w0) {
+				vec3 v = normalize(w0);
+				vec3 r = reflect(-v, n);
+				vec3 f0 = vec3(0.04);
+				f0      = mix(f0, albedo, metallic);
+				vec3 Ks = Fr(f0, n, v, a);
+				vec3 Kd = 1.0 - Ks;
+				Kd *= 1.0 - metallic;
+				vec3 irr = Kd * albedo * PI * env(texture2D(envmap, project(n)), 5.0);
+				vec2 envBRDF  = texture2D(lutmap, vec2(max(dot(n, v), 0.0), a)).rg;
+				vec3 refl = (Ks * envBRDF.x + envBRDF.y) * env(texture2D(specmap, project(r), a * 16.0), 287.0);
+				return refl + irr;
+			}
+
 			void main(void) {
 				vec3 albedo = pow(albedoU, vec3(2.2));
 				float roughness = roughnessU;
@@ -177,11 +178,8 @@
 					metallic = texture2D(metallicTexture, texmap).r;
 				}
 				vec3 N = normalize(normal);
-				vec3 ray = reflect(normalize(position), N);
-				vec3 ambient = env(texture2D(envmap, project(N)), 5.0);
-				vec3 spectacular = env(texture2D(specmap, project(ray), roughness * 16.0), 287.0);
-				vec3 color = cookTorranceBRDF(albedo, roughness, metallic, vec3(frontLight), N, -position, vec3(0.0,0.0,1.0)) +
-				cookTorranceEnvMapping(albedo, ambient, spectacular, roughness, metallic, N, -position);
+				vec3 color = cookTorranceBRDF(      albedo, roughness, metallic, N, -position, vec3(0.0,0.0,1.0)) * vec3(frontLight) +
+				             cookTorranceEnvMapping(albedo, roughness, metallic, N, -position);
 				color = color / (color + vec3(1.0));
 				color = pow(color,vec3(1.0/2.2));
 				gl_FragColor = vec4(color, 1.0);
